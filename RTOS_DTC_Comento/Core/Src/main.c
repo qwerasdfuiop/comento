@@ -71,17 +71,22 @@ UART_HandleTypeDef huart4;
 
 /* USER CODE BEGIN PV */
 
-//typedef union {
-//  uint8_t active;
-//  uint8_t raw[7];          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
-//  struct {
-//    uint8_t pci;           /* 길이 등 */
-//    uint8_t sid;           /* 0x03/0x04 OBD2, 0x19/0x14 UDS */
-//    uint8_t dtc_hi;
-//    uint8_t dtc_lo;
-//    uint8_t reserved[4];
-//  } field;
-//} DTC_Table_t;
+typedef union {
+  uint8_t raw[8];          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
+  struct {
+    uint8_t uv_fault;
+    uint8_t sid;
+    uint8_t reserv2;
+    uint8_t reserv3;
+    uint8_t reserv4   : 1;
+    uint8_t reserv5   : 7;
+    uint8_t reserv6;
+    uint8_t reserv7;
+    uint8_t reserv8;
+  } field;
+} Data_t;
+
+Data_t data;
 
 typedef struct {
   uint16_t DTC_Code;              // 고장 코드 (예: C1234)
@@ -95,7 +100,6 @@ volatile uint8_t is_i2c_busy = 0;
 volatile uint8_t is_spi_busy = 0;
 uint8_t faultReg;
 
-uint8_t  can_q[CAN_Q_SIZE][8];
 volatile uint8_t can_head = 0, can_tail = 0;
 
 /* USER CODE END PV */
@@ -118,7 +122,7 @@ void EEPROM_WriteDTC(void);
 
 void EEPROM_ReadDTC(void);
 
-void Process_CAN_Response(uint8_t *data);
+void Process_CAN_Response(Data_t data);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -136,7 +140,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+	const char msg[] = "ECU System Running\r\n";
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -175,22 +179,24 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+	is_i2c_busy = 1;
 	HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, PMIC_FAULT_STATUS1_REG, I2C_MEMADD_SIZE_8BIT, &faultReg, 1);
+	while(is_i2c_busy);
 	if (faultReg & 0x01) {
 	  if (DTC_Table.active == 0) {
 		DTC_Table.active = 1;
 		EEPROM_WriteDTC();
 	  }
 	}
-	while(is_i2c_busy);
 
 	EEPROM_WriteDTC();
-	while(is_spi_busy);
 
-  if (can_tail != can_head) {
-    Process_CAN_Response(can_q[can_tail]);
-    can_tail = (can_tail + 1) % CAN_Q_SIZE;
-  }
+//  if (can_tail != can_head) {
+	Process_CAN_Response(data);
+//	can_tail = (can_tail + 1) % CAN_Q_SIZE;
+//  }
+
+  HAL_UART_Transmit(&huart4, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 
 
 
@@ -594,14 +600,17 @@ void EEPROM_WriteEnable(void) {
 }
 
 void EEPROM_WriteDTC(void) {
+
   uint8_t cmd[3];
   EEPROM_WriteEnable();
   cmd[0] = EEPROM_CMD_WRITE;
   cmd[1] = (EEPROM_DTC_ADDR >> 8) & 0xFF;
   cmd[2] = EEPROM_DTC_ADDR & 0xFF;
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
+  is_spi_busy = 1;
   HAL_SPI_Transmit_DMA(&hspi1, cmd, 3);
   while(is_spi_busy);
+  is_spi_busy = 1;
   HAL_SPI_Transmit_DMA(&hspi1, (uint8_t*)&DTC_Table, sizeof(DTC_Table));
   while(is_spi_busy);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
@@ -618,7 +627,8 @@ void EEPROM_ReadDTC(void) {
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
 }
 
-void Process_CAN_Response(uint8_t *data) {
+void Process_CAN_Response(Data_t data) {
+
   CAN_TxHeaderTypeDef TxHeader;
   uint32_t TxMailbox;
   uint8_t TxData[8] = {0};
@@ -629,7 +639,7 @@ void Process_CAN_Response(uint8_t *data) {
   TxHeader.DLC = 8;
 
   // OBD2 0x43: Read DTCs
-  if (data[1] == 0x43) {
+  if (data.field.sid == 0x43) {
     if (DTC_Table.active) {
       TxData[0] = 0x03; TxData[1] = 0x43;
       TxData[2] = (DTC_Table.DTC_Code >> 8) & 0xFF;
@@ -639,13 +649,13 @@ void Process_CAN_Response(uint8_t *data) {
     }
   }
   // OBD2 0x04: Clear DTCs
-  else if (data[1] == 0x04) {
+  else if (data.field.sid == 0x04) {
     DTC_Table.active = 0;
     EEPROM_WriteDTC();
     TxData[0] = 0x01; TxData[1] = 0x44; // 응답
   }
   // UDS 0x19: Read DTCs
-  else if (data[1] == 0x19) {
+  else if (data.field.sid == 0x19) {
     if (DTC_Table.active) {
       TxData[0] = 0x03; TxData[1] = 0x59; TxData[2] = 0x02;
       TxData[3] = (DTC_Table.DTC_Code >> 8) & 0xFF;
@@ -655,7 +665,7 @@ void Process_CAN_Response(uint8_t *data) {
     }
   }
   // UDS 0x14: Clear DTCs
-  else if (data[1] == 0x14) {
+  else if (data.field.sid == 0x14) {
     DTC_Table.active = 0;
     EEPROM_WriteDTC();
     TxData[0] = 0x02; TxData[1] = 0x54; // 응답
@@ -684,13 +694,12 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
   CAN_RxHeaderTypeDef hdr;
-  uint8_t data[8];
-  uint8_t next = (can_head + 1) % CAN_Q_SIZE;
-  HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &hdr, data);
-  if (next != can_tail) {          /* 가득 차면 drop */
-    memcpy(can_q[can_head], data, 8);
-    can_head = next;
-  }
+//  uint8_t next = (can_head + 1) % CAN_Q_SIZE;
+  HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &hdr, data.raw);
+//  if (next != can_tail) {          /* 가득 차면 drop */
+//    memcpy(can_q[can_head], data.raw, 8);
+//    can_head = next;
+//  }
 }
 /* USER CODE END 4 */
 
