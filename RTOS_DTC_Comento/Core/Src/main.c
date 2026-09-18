@@ -44,10 +44,10 @@
 #define EEPROM_DTC_ADDR  0x0000
 
 #define PMIC_I2C_ADDR  (0x60 << 1)
-#define PMIC_FAULT_STATUS1_REG  0x07    // FAULT_STATUS1 레지스터
 #define PMIC_V_REFA_HIGH  0x13
 #define PMIC_V_REFA_LOW  0x14
-#define CAN_Q_SIZE 8
+#define V_REF_SET 0xFF // 임의의 값 설정
+//#define CAN_Q_SIZE 8
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -73,12 +73,14 @@ UART_HandleTypeDef huart4;
 
 /* USER CODE BEGIN PV */
 
+// fault 레지스터들의 메모리 주소를 열거형으로
 enum PMICRegisters {
 	VOLTAGE_REG = 0x07,
 	CURRENT_REG = 0x08,
 	TEMPERATURE_REG = 0x09,
 };
 
+// UV, OV를 확인할 수 있는 레지스터
 typedef union {
   uint8_t raw;          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
   struct {
@@ -95,6 +97,7 @@ typedef union {
 
 voltfault faultreg1;
 
+// OBD, UDS 형태의 데이터 프레임
 typedef union {
   uint8_t raw[8];          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
   struct {
@@ -111,6 +114,7 @@ typedef union {
 
 Data_t data;
 
+
 typedef struct {
   uint16_t DTC_Code;              // 고장 코드 (예: C1234)
   //char Description[50];           // 설명 문자열
@@ -119,14 +123,15 @@ typedef struct {
 
 DTC_Table_t DTC_Table = { 0x1234, 0 };
 
+// 인터럽트 완료 확인을 위한 플래그 변수
 volatile uint8_t is_i2c_busy = 0;
 volatile uint8_t is_spi_busy = 0;
 volatile uint8_t can_rx_flag = 0;
-uint8_t faultReg;
 
-volatile uint8_t can_head = 0, can_tail = 0;
+//volatile uint8_t can_head = 0, can_tail = 0;
 
-uint16_t v_ref_set = 0xFF;
+// 임의로 V_REF 단계 설정 가능.
+uint16_t v_ref_set = V_REF_SET;
 
 /* USER CODE END PV */
 
@@ -201,6 +206,7 @@ int main(void)
   HAL_CAN_Start(&hcan1);
   HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 
+  //VREF 값 설정
   PMIC_Vref_Change(v_ref_set);
   /* USER CODE END 2 */
 
@@ -209,21 +215,24 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+
+	//I2C DMA INTERRUPT 방식으로 UV 혹은 OV 여부 READ
     is_i2c_busy = 1;
     HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, VOLTAGE_REG, I2C_MEMADD_SIZE_8BIT, &faultreg1.raw, 1);
     while(is_i2c_busy);
+    //만일 UV 혹은 OV 가 있다면 EEPROM에 DTC를 WRITE
     if (faultreg1.bit.bucka_uv) {
       if (DTC_Table.active == 0) {
 		  DTC_Table.active = 1;
 		  EEPROM_WriteDTC();
       }
     }
-
+    // CAN INTERRUPT 방식으로 UDS / OBD 메시지 송수신
   if (can_rx_flag) {
 	can_rx_flag = 0;
 	Process_CAN_Response(data);
   }
-
+  // uart 폴링 방식으로 터미널로 전송
   HAL_UART_Transmit(&huart4, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 
 
@@ -358,6 +367,8 @@ static void MX_CAN1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN CAN1_Init 2 */
+
+  // 필터에 해당하는 메시지만 수신 하도록 초기화
   CAN_FilterTypeDef f = {0};
   f.FilterBank = 0;
   f.FilterMode = CAN_FILTERMODE_IDMASK;
