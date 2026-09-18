@@ -45,6 +45,8 @@
 
 #define PMIC_I2C_ADDR  (0x60 << 1)
 #define PMIC_FAULT_STATUS1_REG  0x07    // FAULT_STATUS1 레지스터
+#define PMIC_V_REFA_HIGH  0x13
+#define PMIC_V_REFA_LOW  0x14
 #define CAN_Q_SIZE 8
 /* USER CODE END PM */
 
@@ -74,7 +76,7 @@ UART_HandleTypeDef huart4;
 typedef union {
   uint8_t raw[8];          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
   struct {
-    uint8_t uv_fault;
+    uint8_t pci;
     uint8_t sid;
     uint8_t reserv2;
     uint8_t reserv3;
@@ -98,9 +100,12 @@ DTC_Table_t DTC_Table = { 0x1234, "Brake UV Fault", 0 };
 
 volatile uint8_t is_i2c_busy = 0;
 volatile uint8_t is_spi_busy = 0;
+volatile uint8_t can_rx_flag = 0;
 uint8_t faultReg;
 
 volatile uint8_t can_head = 0, can_tail = 0;
+
+uint16_t v_ref_set = 0xFF;
 
 /* USER CODE END PV */
 
@@ -123,6 +128,8 @@ void EEPROM_WriteDTC(void);
 void EEPROM_ReadDTC(void);
 
 void Process_CAN_Response(Data_t data);
+
+void PMIC_Vref_Change(uint16_t v_ref_set);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -172,6 +179,8 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_CAN_Start(&hcan1);
   HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
+
+  PMIC_Vref_Change(v_ref_set);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -179,22 +188,22 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	is_i2c_busy = 1;
-	HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, PMIC_FAULT_STATUS1_REG, I2C_MEMADD_SIZE_8BIT, &faultReg, 1);
-	while(is_i2c_busy);
-	if (faultReg & 0x01) {
-	  if (DTC_Table.active == 0) {
-		DTC_Table.active = 1;
-		EEPROM_WriteDTC();
-	  }
-	}
+    is_i2c_busy = 1;
+    HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, PMIC_FAULT_STATUS1_REG, I2C_MEMADD_SIZE_8BIT, &faultReg, 1);
+    while(is_i2c_busy);
+    if (faultReg & 0x01) {
+      if (DTC_Table.active == 0) {
+      DTC_Table.active = 1;
+      EEPROM_WriteDTC();
+      }
+    }
 
 	EEPROM_WriteDTC();
 
-//  if (can_tail != can_head) {
-	Process_CAN_Response(data);
-//	can_tail = (can_tail + 1) % CAN_Q_SIZE;
-//  }
+  if (can_rx_flag) {
+    can_rx_flag = 0;
+	  Process_CAN_Response(data);
+  }
 
   HAL_UART_Transmit(&huart4, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 
@@ -330,7 +339,18 @@ static void MX_CAN1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN CAN1_Init 2 */
-
+  CAN_FilterTypeDef f = {0};
+  f.FilterBank = 0;
+  f.FilterMode = CAN_FILTERMODE_IDMASK;
+  f.FilterScale = CAN_FILTERSCALE_32BIT;
+  f.FilterIdHigh = 0x0000;
+  f.FilterIdLow  = 0x0000;
+  f.FilterMaskIdHigh = 0x0000;  /* 마스크 0 = 전부 통과 */
+  f.FilterMaskIdLow  = 0x0000;
+  f.FilterFIFOAssignment = CAN_RX_FIFO0;
+  f.FilterActivation = ENABLE;
+  f.SlaveStartFilterBank = 14;
+  HAL_CAN_ConfigFilter(&hcan1, &f);
   /* USER CODE END CAN1_Init 2 */
 
 }
@@ -639,7 +659,7 @@ void Process_CAN_Response(Data_t data) {
   TxHeader.DLC = 8;
 
   // OBD2 0x43: Read DTCs
-  if (data.field.sid == 0x43) {
+  if (data.field.sid == 0x03) {
     if (DTC_Table.active) {
       TxData[0] = 0x03; TxData[1] = 0x43;
       TxData[2] = (DTC_Table.DTC_Code >> 8) & 0xFF;
@@ -652,7 +672,7 @@ void Process_CAN_Response(Data_t data) {
   else if (data.field.sid == 0x04) {
     DTC_Table.active = 0;
     EEPROM_WriteDTC();
-    TxData[0] = 0x01; TxData[1] = 0x44; // 응답
+    TxData[0] = 0x01; TxData[1] = 0x44;// 응답
   }
   // UDS 0x19: Read DTCs
   else if (data.field.sid == 0x19) {
@@ -694,12 +714,24 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
   CAN_RxHeaderTypeDef hdr;
-//  uint8_t next = (can_head + 1) % CAN_Q_SIZE;
-  HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &hdr, data.raw);
-//  if (next != can_tail) {          /* 가득 차면 drop */
-//    memcpy(can_q[can_head], data.raw, 8);
-//    can_head = next;
-//  }
+
+  if(HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &hdr, data.raw) == HAL_OK){
+    can_rx_flag = 1;
+  }
+}
+
+void PMIC_Vref_Change(uint16_t v_ref_set){
+
+	uint8_t v_ref_temp = 0;
+
+    HAL_I2C_Mem_Read(&hi2c1, PMIC_I2C_ADDR, PMIC_V_REFA_HIGH, I2C_MEMADD_SIZE_8BIT, &v_ref_temp, 1, HAL_MAX_DELAY);
+    v_ref_temp = (v_ref_temp & 0xFC) | (uint8_t)(v_ref_set >> 8);
+	HAL_I2C_Mem_Write(&hi2c1, PMIC_I2C_ADDR, PMIC_V_REFA_HIGH, I2C_MEMADD_SIZE_8BIT, &v_ref_temp, 1, HAL_MAX_DELAY);
+
+	v_ref_temp = v_ref_set & 0xFF;
+
+	HAL_I2C_Mem_Write(&hi2c1, PMIC_I2C_ADDR, PMIC_V_REFA_LOW, I2C_MEMADD_SIZE_8BIT, &v_ref_temp, 1, HAL_MAX_DELAY);
+
 }
 /* USER CODE END 4 */
 
