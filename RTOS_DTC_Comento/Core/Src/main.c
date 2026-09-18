@@ -73,6 +73,28 @@ UART_HandleTypeDef huart4;
 
 /* USER CODE BEGIN PV */
 
+enum PMICRegisters {
+	VOLTAGE_REG = 0x07,
+	CURRENT_REG = 0x08,
+	TEMPERATURE_REG = 0x09,
+};
+
+typedef union {
+  uint8_t raw;          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
+  struct {
+    uint8_t bucka_uv	:1;
+    uint8_t buckb_uv	:1;
+    uint8_t buckc_uv	:1;
+    uint8_t buckd_uv	:1;
+    uint8_t bucka_ov	:1;
+    uint8_t buckb_ov	:1;
+    uint8_t buckc_ov	:1;
+    uint8_t buckd_ov	:1;
+  } bit;
+} voltfault;
+
+voltfault faultreg1;
+
 typedef union {
   uint8_t raw[8];          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
   struct {
@@ -80,11 +102,10 @@ typedef union {
     uint8_t sid;
     uint8_t reserv2;
     uint8_t reserv3;
-    uint8_t reserv4   : 1;
-    uint8_t reserv5   : 7;
+    uint8_t reserv4;
+    uint8_t reserv5;
     uint8_t reserv6;
     uint8_t reserv7;
-    uint8_t reserv8;
   } field;
 } Data_t;
 
@@ -92,11 +113,11 @@ Data_t data;
 
 typedef struct {
   uint16_t DTC_Code;              // 고장 코드 (예: C1234)
-  char Description[50];           // 설명 문자열
+  //char Description[50];           // 설명 문자열
   uint8_t active;                 // 활성화 상태 플래그
 } DTC_Table_t;
 
-DTC_Table_t DTC_Table = { 0x1234, "Brake UV Fault", 0 };
+DTC_Table_t DTC_Table = { 0x1234, 0 };
 
 volatile uint8_t is_i2c_busy = 0;
 volatile uint8_t is_spi_busy = 0;
@@ -189,20 +210,18 @@ int main(void)
   {
     /* USER CODE END WHILE */
     is_i2c_busy = 1;
-    HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, PMIC_FAULT_STATUS1_REG, I2C_MEMADD_SIZE_8BIT, &faultReg, 1);
+    HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, VOLTAGE_REG, I2C_MEMADD_SIZE_8BIT, &faultreg1.raw, 1);
     while(is_i2c_busy);
-    if (faultReg & 0x01) {
+    if (faultreg1.bit.bucka_uv) {
       if (DTC_Table.active == 0) {
-      DTC_Table.active = 1;
-      EEPROM_WriteDTC();
+		  DTC_Table.active = 1;
+		  EEPROM_WriteDTC();
       }
     }
 
-	EEPROM_WriteDTC();
-
   if (can_rx_flag) {
-    can_rx_flag = 0;
-	  Process_CAN_Response(data);
+	can_rx_flag = 0;
+	Process_CAN_Response(data);
   }
 
   HAL_UART_Transmit(&huart4, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);

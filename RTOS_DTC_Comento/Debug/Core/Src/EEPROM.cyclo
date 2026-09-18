@@ -1,0 +1,3 @@
+../Core/Src/EEPROM.c:14:6:EEPROM_WriteEnable	1
+../Core/Src/EEPROM.c:21:6:EEPROM_WriteDTC	3
+../Core/Src/EEPROM.c:38:6:EEPROM_ReadDTC	1
