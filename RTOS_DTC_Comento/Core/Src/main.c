@@ -42,11 +42,13 @@
 #define EEPROM_CMD_WRITE 0x02
 #define EEPROM_CMD_READ  0x03
 #define EEPROM_DTC_ADDR  0x0000
+#define MAX_DTC_NUM 3
 
 #define PMIC_I2C_ADDR  (0x60 << 1)
 #define PMIC_V_REFA_HIGH  0x13
 #define PMIC_V_REFA_LOW  0x14
 #define V_REF_SET 0xFF // 임의의 값 설정
+
 //#define CAN_Q_SIZE 8
 /* USER CODE END PM */
 
@@ -74,28 +76,41 @@ UART_HandleTypeDef huart4;
 /* USER CODE BEGIN PV */
 
 // fault 레지스터들의 메모리 주소를 열거형으로
-enum PMICRegisters {
-	VOLTAGE_REG = 0x07,
-	CURRENT_REG = 0x08,
-	TEMPERATURE_REG = 0x09,
+enum PMICRegisters_t {
+	VOLTAGE_FAULT_ADDR = 0x07,
+	CURRENT_FAULT_ADDR = 0x08,
+	TEMPERATURE_FAULT_ADDR = 0x09,
 };
 
 // UV, OV를 확인할 수 있는 레지스터
 typedef union {
   uint8_t raw;          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
   struct {
-    uint8_t bucka_uv	:1;
-    uint8_t buckb_uv	:1;
-    uint8_t buckc_uv	:1;
-    uint8_t buckd_uv	:1;
-    uint8_t bucka_ov	:1;
-    uint8_t buckb_ov	:1;
-    uint8_t buckc_ov	:1;
-    uint8_t buckd_ov	:1;
+    uint8_t buckx_uv	:4;
+    uint8_t buckx_ov	:4;
   } bit;
-} voltfault;
+} voltage_fault_reg;
 
-voltfault faultreg1;
+voltage_fault_reg voltage_reg_buff;
+
+typedef union {
+  uint8_t raw;          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
+  struct {
+    uint8_t buckx_oc;
+  } bit;
+} current_fault_reg;
+
+current_fault_reg current_reg_buff;
+
+//typedef union {
+//  uint8_t raw;          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
+//  struct {
+//    uint8_t reserved	:6;
+//    uint8_t high_temp	:2;
+//  } bit;
+//} temperature_fault_reg;
+
+//temperature_fault_reg temperature_reg_buff;
 
 // OBD, UDS 형태의 데이터 프레임
 typedef union {
@@ -110,18 +125,37 @@ typedef union {
     uint8_t reserv6;
     uint8_t reserv7;
   } field;
-} Data_t;
+} CANData_t;
 
-Data_t data;
+CANData_t data;
 
+enum DTC_Code_t {
+	UV = 0x12,
+	OV = 0x34,
+	OC = 0x56,
+	//HIGH_TEMP = 0x4567
+};
 
 typedef struct {
-  uint16_t DTC_Code;              // 고장 코드 (예: C1234)
-  //char Description[50];           // 설명 문자열
+  uint8_t DTC_Code;              // 고장 코드 (예: C1234)
+//  char Description[50];           // 설명 문자열
   uint8_t active;                 // 활성화 상태 플래그
-} DTC_Table_t;
+} DTC_t;
 
-DTC_Table_t DTC_Table = { 0x1234, 0 };
+DTC_t dtclst[MAX_DTC_NUM] = {
+		{UV, 0},
+		{OV, 0},
+		{OC, 0},
+		//{HIGH_TEMP, 0},
+};
+
+enum DTC_Index_t {
+	UVinDTC = 0,
+	OVinDTC = 1,
+	OCinDTC = 2,
+	//HIGH_TEMPinDTC = 3
+};
+
 
 // 인터럽트 완료 확인을 위한 플래그 변수
 volatile uint8_t is_i2c_busy = 0;
@@ -147,13 +181,15 @@ static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_UART4_Init(void);
 
+void PMIC_Read_Fault(void);
+
 void EEPROM_WriteEnable(void);
 
 void EEPROM_WriteDTC(void);
-
-void EEPROM_ReadDTC(void);
-
-void Process_CAN_Response(Data_t data);
+//
+//void EEPROM_ReadDTC(void);
+//
+void Process_CAN_Response(CANData_t data);
 
 void PMIC_Vref_Change(uint16_t v_ref_set);
 /* USER CODE BEGIN PFP */
@@ -173,7 +209,8 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-	const char msg[] = "ECU System Running\r\n";
+	const char msg1[] = "ECU System Running\r\n";
+	const char msg2[] = "ECU System Went Wrong\r\n";
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -217,23 +254,44 @@ int main(void)
     /* USER CODE END WHILE */
 
 	//I2C DMA INTERRUPT 방식으로 UV 혹은 OV 여부 READ
-    is_i2c_busy = 1;
-    HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, VOLTAGE_REG, I2C_MEMADD_SIZE_8BIT, &faultreg1.raw, 1);
-    while(is_i2c_busy);
+	PMIC_Read_Fault();
     //만일 UV 혹은 OV 가 있다면 EEPROM에 DTC를 WRITE
-    if (faultreg1.bit.bucka_uv) {
-      if (DTC_Table.active == 0) {
-		  DTC_Table.active = 1;
-		  EEPROM_WriteDTC();
-      }
-    }
+	if(voltage_reg_buff.raw || current_reg_buff.raw){
+		if (voltage_reg_buff.bit.buckx_uv) {
+		  if (dtclst[UVinDTC].active == 0) {
+			  dtclst[UVinDTC].active = 1;
+		  }
+		}
+		if (voltage_reg_buff.bit.buckx_ov) {
+		  if (dtclst[OVinDTC].active == 0) {
+			  dtclst[OVinDTC].active = 1;
+		  }
+		}
+		if (current_reg_buff.bit.buckx_oc) {
+		  if (dtclst[OCinDTC].active == 0) {
+			  dtclst[OCinDTC].active = 1;
+		  }
+		}
+//		if (temperature_reg_buff.bit.high_temp) {
+//		  if (dtclst[HIGH_TEMPinDTC].active == 0) {
+//			  dtclst[HIGH_TEMPinDTC].active = 1;
+//		  }
+//		}
+		EEPROM_WriteDTC();
+	}
+
     // CAN INTERRUPT 방식으로 UDS / OBD 메시지 송수신
-  if (can_rx_flag) {
-	can_rx_flag = 0;
-	Process_CAN_Response(data);
-  }
-  // uart 폴링 방식으로 터미널로 전송
-  HAL_UART_Transmit(&huart4, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+    if (can_rx_flag) {
+	  can_rx_flag = 0;
+	  Process_CAN_Response(data);
+    }
+    // uart 폴링 방식으로 터미널로 전송
+    for(int i = 0; i < MAX_DTC_NUM; i++){
+    	if(dtclst[i].active == 1){
+    		HAL_UART_Transmit(&huart4, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
+    	}
+    }
+    HAL_UART_Transmit(&huart4, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
 
 
 
@@ -642,6 +700,21 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void PMIC_Read_Fault(void){
+
+	is_i2c_busy = 1;
+	HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, VOLTAGE_FAULT_ADDR, I2C_MEMADD_SIZE_8BIT, &voltage_reg_buff.raw, 1);
+	while(is_i2c_busy);
+
+	is_i2c_busy = 1;
+	HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, CURRENT_FAULT_ADDR, I2C_MEMADD_SIZE_8BIT, &current_reg_buff.raw, 1);
+	while(is_i2c_busy);
+
+//	is_i2c_busy = 1;
+//	HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, TEMPERATURE_FAULT_ADDR, I2C_MEMADD_SIZE_8BIT, &temperature_reg_buff.raw, 1);
+//	while(is_i2c_busy);
+}
+
 void EEPROM_WriteEnable(void) {
   uint8_t cmd = EEPROM_CMD_WREN;
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
@@ -661,23 +734,23 @@ void EEPROM_WriteDTC(void) {
   HAL_SPI_Transmit_DMA(&hspi1, cmd, 3);
   while(is_spi_busy);
   is_spi_busy = 1;
-  HAL_SPI_Transmit_DMA(&hspi1, (uint8_t*)&DTC_Table, sizeof(DTC_Table));
+  HAL_SPI_Transmit_DMA(&hspi1, (uint8_t*)&dtclst, sizeof(dtclst));
   while(is_spi_busy);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
 }
-
-void EEPROM_ReadDTC(void) {
-  uint8_t cmd[3];
-  cmd[0] = EEPROM_CMD_READ;
-  cmd[1] = (EEPROM_DTC_ADDR >> 8) & 0xFF;
-  cmd[2] = EEPROM_DTC_ADDR & 0xFF;
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-  HAL_SPI_Transmit(&hspi1, cmd, 3, HAL_MAX_DELAY);
-  HAL_SPI_Receive(&hspi1, (uint8_t*)&DTC_Table, sizeof(DTC_Table), HAL_MAX_DELAY);
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
-}
-
-void Process_CAN_Response(Data_t data) {
+//
+//void EEPROM_ReadDTC(void) {
+//  uint8_t cmd[3];
+//  cmd[0] = EEPROM_CMD_READ;
+//  cmd[1] = (EEPROM_DTC_ADDR >> 8) & 0xFF;
+//  cmd[2] = EEPROM_DTC_ADDR & 0xFF;
+//  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
+//  HAL_SPI_Transmit(&hspi1, cmd, 3, HAL_MAX_DELAY);
+//  HAL_SPI_Receive(&hspi1, (uint8_t*)&DTC_Table, sizeof(DTC_Table), HAL_MAX_DELAY);
+//  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
+//}
+//
+void Process_CAN_Response(CANData_t data) {
 
   CAN_TxHeaderTypeDef TxHeader;
   uint32_t TxMailbox;
@@ -690,35 +763,39 @@ void Process_CAN_Response(Data_t data) {
 
   // OBD2 0x43: Read DTCs
   if (data.field.sid == 0x03) {
-    if (DTC_Table.active) {
-      TxData[0] = 0x03; TxData[1] = 0x43;
-      TxData[2] = (DTC_Table.DTC_Code >> 8) & 0xFF;
-      TxData[3] = DTC_Table.DTC_Code & 0xFF;
-    } else {
-      TxData[0] = 0x01; TxData[1] = 0x43; TxData[2] = 0x00;
-    }
+      TxData[1] = 0x43;
+      TxData[2] = UV;
+      TxData[3] = dtclst[UVinDTC].active;
+      TxData[4] = OV;
+      TxData[5] = dtclst[OVinDTC].active;
+      TxData[6] = OC;
+      TxData[7] = dtclst[OCinDTC].active;
   }
   // OBD2 0x04: Clear DTCs
   else if (data.field.sid == 0x04) {
-    DTC_Table.active = 0;
-    EEPROM_WriteDTC();
-    TxData[0] = 0x01; TxData[1] = 0x44;// 응답
+	for(int i = 0; i < MAX_DTC_NUM; i++){
+		dtclst[i].active = 0;
+	}
+	EEPROM_WriteDTC();
+    TxData[1] = 0x44;// 응답
   }
   // UDS 0x19: Read DTCs
   else if (data.field.sid == 0x19) {
-    if (DTC_Table.active) {
-      TxData[0] = 0x03; TxData[1] = 0x59; TxData[2] = 0x02;
-      TxData[3] = (DTC_Table.DTC_Code >> 8) & 0xFF;
-      TxData[4] = DTC_Table.DTC_Code & 0xFF;
-    } else {
-      TxData[0] = 0x01; TxData[1] = 0x59; TxData[2] = 0x00;
-    }
+	  TxData[1] = 0x59;
+	  TxData[2] = UV;
+	  TxData[3] = dtclst[UVinDTC].active;
+	  TxData[4] = OV;
+	  TxData[5] = dtclst[OVinDTC].active;
+	  TxData[6] = OC;
+	  TxData[7] = dtclst[OCinDTC].active;
   }
   // UDS 0x14: Clear DTCs
   else if (data.field.sid == 0x14) {
-    DTC_Table.active = 0;
-    EEPROM_WriteDTC();
-    TxData[0] = 0x02; TxData[1] = 0x54; // 응답
+	for(int i = 0; i < MAX_DTC_NUM; i++){
+		dtclst[i].active = 0;
+	}
+	EEPROM_WriteDTC();
+    TxData[1] = 0x54; // 응답
   }
   else
   {
