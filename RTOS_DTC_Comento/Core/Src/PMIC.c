@@ -12,6 +12,7 @@ uint16_t v_ref_set = V_REF_SET;
 
 volatile uint8_t is_i2c_busy = 0;
 
+// 각각의 fault register로부터 고장 정보 읽기
 void PMIC_Read_Fault(void){
 
 	is_i2c_busy = 1;
@@ -27,6 +28,7 @@ void PMIC_Read_Fault(void){
 //	while(is_i2c_busy);
 }
 
+// v_reg_set에 따라 PMIC의 VRET 값 설정.
 void PMIC_Vref_Change(uint16_t v_ref_set){
 
 	uint8_t v_ref_temp = 0;

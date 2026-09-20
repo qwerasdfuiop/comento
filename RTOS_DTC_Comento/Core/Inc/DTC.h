@@ -33,4 +33,6 @@ enum DTC_Index_t {
 
 extern DTC_t dtclst[MAX_DTC_NUM];
 
+void DTCProcessFault(void);
+
 #endif

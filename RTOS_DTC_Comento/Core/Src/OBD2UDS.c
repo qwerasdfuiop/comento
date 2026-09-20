@@ -21,7 +21,7 @@ void Process_CAN_Response(CANData_t data) {
 
   int index = 2;
 
-  // OBD2 0x43: Read DTCs
+  // OBD2 0x03: Read DTCs
   if (data.field.sid == 0x03) {
 
 	  TxData[1] = 0x43;

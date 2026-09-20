@@ -25,6 +25,7 @@
 #include "DTC.h"
 #include "EEPROM.h"
 #include "OBD2UDS.h"
+#include "TestCase.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -105,8 +106,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-	const char msg1[] = "ECU System Running\r\n";
-	const char msg2[] = "ECU System Went Wrong\r\n";
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -136,67 +136,61 @@ int main(void)
   MX_SPI2_Init();
   MX_UART4_Init();
   /* USER CODE BEGIN 2 */
+
+  //CAN 인터럽트 시작
   HAL_CAN_Start(&hcan1);
   HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 
+#ifdef TEST_CASE
+  TestCase_RunAll();
+#else
+  //전원이 꺼지기 전 EEPROM에 저장된 DTC 정보 읽기
   EEPROM_ReadDTC();
 
-  //VREF 값 설정
+  //PMIC의 VREF 값 설정
   PMIC_Vref_Change(v_ref_set);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+	//msg1은 고장이 없을때 UART 출력, msg2는 고장이 있을때 UART 출력
+	const char msg1[] = "ECU System Running\r\n";
+	const char msg2[] = "ECU System Went Wrong\r\n";
   while (1)
   {
     /* USER CODE END WHILE */
 
-	//I2C DMA INTERRUPT 방식으로 UV 혹은 OV 여부 READ
+	//I2C DMA INTERRUPT 방식으로 UV 혹은 OV 혹은 OC 여부 READ
 	PMIC_Read_Fault();
+
     //만일 UV 혹은 OV 가 있다면 EEPROM에 DTC를 WRITE
-	if(voltage_reg_buff.raw || current_reg_buff.raw){
-		if (voltage_reg_buff.bit.buckx_uv) {
-		  if (dtclst[UVinDTC].active == 0) {
-			  dtclst[UVinDTC].active = 1;
-		  }
-		}
-		if (voltage_reg_buff.bit.buckx_ov) {
-		  if (dtclst[OVinDTC].active == 0) {
-			  dtclst[OVinDTC].active = 1;
-		  }
-		}
-		if (current_reg_buff.bit.buckx_oc) {
-		  if (dtclst[OCinDTC].active == 0) {
-			  dtclst[OCinDTC].active = 1;
-		  }
-		}
-//		if (temperature_reg_buff.bit.high_temp) {
-//		  if (dtclst[HIGH_TEMPinDTC].active == 0) {
-//			  dtclst[HIGH_TEMPinDTC].active = 1;
-//		  }
-//		}
-		EEPROM_WriteDTC();
-	}
+	DTCProcessFault();
 
     // CAN INTERRUPT 방식으로 UDS / OBD 메시지 송수신
     if (can_rx_flag) {
 	  can_rx_flag = 0;
 	  Process_CAN_Response(data);
     }
-    // uart 폴링 방식으로 터미널로 전송
+
+    // uart 폴링 방식으로 메시지 출력. 고장이 있으면 고장 개수만큼 에러 메시지 출력. 고장이 없으면 정상 메시지 출력
+    int err_count = 0;
     for(int i = 0; i < MAX_DTC_NUM; i++){
     	if(dtclst[i].active == 1){
     		HAL_UART_Transmit(&huart4, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
+    		err_count++;
     	}
     }
-    HAL_UART_Transmit(&huart4, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
-
+    if(err_count == 0){
+    	HAL_UART_Transmit(&huart4, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
+    }
 
 
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
+#endif
 }
+
 
 /**
   * @brief System Clock Configuration
@@ -599,23 +593,21 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-
-
-
-
+//I2C 수신 콜백(is_i2c_busy 플래그 0 초기화)
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
   if (hi2c->Instance == I2C1) {
     is_i2c_busy = 0;
   }
 }
+//I2C 송신 콜백(is_i2c_busy 플래그 0 초기화)
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   if (hspi->Instance == SPI1) {
     is_spi_busy = 0;
   }
 }
-
+//CAN 수신 콜백(FIFO로부터 data 변수에 payload 저장 후 can_rx_flag = 1 초기화
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
   CAN_RxHeaderTypeDef hdr;
