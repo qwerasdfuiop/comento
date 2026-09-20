@@ -21,6 +21,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include <string.h>
+#include "PMIC.h"
+#include "DTC.h"
+#include "EEPROM.h"
+#include "OBD2UDS.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -37,20 +41,10 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-// SPI EEPROM 명령어
-#define EEPROM_CMD_WREN  0x06
-#define EEPROM_CMD_WRITE 0x02
-#define EEPROM_CMD_READ  0x03
-#define EEPROM_DTC_ADDR  0x0000
 
-// PMIC 주소
-#define PMIC_I2C_ADDR  (0x60 << 1)
-#define PMIC_V_REFA_HIGH  0x13
-#define PMIC_V_REFA_LOW  0x14
-#define V_REF_SET 0xFF // 임의의 값 설정
 
-//DTC 고장 코드 종류 개수
-#define MAX_DTC_NUM 3
+
+
 
 //#define CAN_Q_SIZE 8
 /* USER CODE END PM */
@@ -78,107 +72,7 @@ UART_HandleTypeDef huart4;
 
 /* USER CODE BEGIN PV */
 
-// fault 레지스터들의 메모리 주소를 열거형으로
-enum PMICRegisters_t {
-	VOLTAGE_FAULT_ADDR = 0x07,
-	CURRENT_FAULT_ADDR = 0x08,
-	TEMPERATURE_FAULT_ADDR = 0x09,
-};
-
-// UV, OV를 확인할 수 있는 레지스터 버퍼
-typedef union {
-  uint8_t raw;          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
-  struct {
-    uint8_t buckx_uv	:4;
-    uint8_t buckx_ov	:4;
-  } bit;
-} voltage_fault_reg;
-
-voltage_fault_reg voltage_reg_buff;
-
-// OC를 확인할 수 있는 레지스터 버퍼
-typedef union {
-  uint8_t raw;          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
-  struct {
-    uint8_t buckx_oc;
-  } bit;
-} current_fault_reg;
-
-current_fault_reg current_reg_buff;
-
-// HIGH_TEMP를 확인할 수 있는 레지스터 버퍼
-//typedef union {
-//  uint8_t raw;          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
-//  struct {
-//    uint8_t reserved	:6;
-//    uint8_t high_temp	:2;
-//  } bit;
-//} temperature_fault_reg;
-
-//temperature_fault_reg temperature_reg_buff;
-
-// OBD, UDS 형태의 데이터 프레임 버퍼
-typedef union {
-  uint8_t raw[8];          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
-  struct {
-    uint8_t pci;
-    uint8_t sid;
-    uint8_t reserv2;
-    uint8_t reserv3;
-    uint8_t reserv4;
-    uint8_t reserv5;
-    uint8_t reserv6;
-    uint8_t reserv7;
-  } field;
-} CANData_t;
-
-CANData_t data;
-
-// DTC Code 종류
-enum DTC_Code_t {
-	UV = 0x1234,
-	OV = 0x3456,
-	OC = 0x5678,
-	//HIGH_TEMP = 0x4567
-};
-
-#pragma pack(push, 1)
-
-// DTC Code와 활성화 여부를 같이 저장하기 위한 구조체
-typedef struct {
-  uint16_t DTC_Code;              // 고장 코드 (예: C1234)
-//  char Description[50];           // 설명 문자열
-  uint8_t active;                 // 활성화 상태 플래그
-} DTC_t;
-
-#pragma pack(pop)
-
-// 위 구조체들의 배열
-DTC_t dtclst[MAX_DTC_NUM] = {
-		{UV, 0},
-		{OV, 0},
-		{OC, 0},
-		//{HIGH_TEMP, 0},
-};
-
-//각 고장 종류가 배열의 어느 인덱스에 있는지 나타내는 열거형
-enum DTC_Index_t {
-	UVinDTC = 0,
-	OVinDTC = 1,
-	OCinDTC = 2,
-	//HIGH_TEMPinDTC = 3
-};
-
-
-// 인터럽트 완료 확인을 위한 플래그 변수
-volatile uint8_t is_i2c_busy = 0;
-volatile uint8_t is_spi_busy = 0;
-volatile uint8_t can_rx_flag = 0;
-
 //volatile uint8_t can_head = 0, can_tail = 0;
-
-// 임의로 V_REF 단계 설정 가능.
-uint16_t v_ref_set = V_REF_SET;
 
 /* USER CODE END PV */
 
@@ -193,25 +87,6 @@ static void MX_I2C2_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_UART4_Init(void);
-
-// PMIC의 VREF 값 변경
-void PMIC_Vref_Change(uint16_t v_ref_set);
-
-// PMIC로부터 i2c로 fault여부 읽는 함수
-void PMIC_Read_Fault(void);
-
-// EEPROM에 Write를 하기 위해서 WREN을 해야 함
-void EEPROM_WriteEnable(void);
-
-// fault가 있을때 EEPROM에 고장 정보 저장
-void EEPROM_WriteDTC(void);
-
-// 루프 시작 전 EEPROM에서 정보 읽기
-void EEPROM_ReadDTC(void);
-
-// CAN 인터럽트 요청에 대한 응답
-void Process_CAN_Response(CANData_t data);
-
 
 /* USER CODE BEGIN PFP */
 
@@ -723,142 +598,10 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void PMIC_Read_Fault(void){
 
-	is_i2c_busy = 1;
-	HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, VOLTAGE_FAULT_ADDR, I2C_MEMADD_SIZE_8BIT, &voltage_reg_buff.raw, 1);
-	while(is_i2c_busy);
 
-	is_i2c_busy = 1;
-	HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, CURRENT_FAULT_ADDR, I2C_MEMADD_SIZE_8BIT, &current_reg_buff.raw, 1);
-	while(is_i2c_busy);
 
-//	is_i2c_busy = 1;
-//	HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, TEMPERATURE_FAULT_ADDR, I2C_MEMADD_SIZE_8BIT, &temperature_reg_buff.raw, 1);
-//	while(is_i2c_busy);
-}
 
-void EEPROM_WriteEnable(void) {
-  uint8_t cmd = EEPROM_CMD_WREN;
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-  HAL_SPI_Transmit(&hspi1, &cmd, 1, HAL_MAX_DELAY);
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
-}
-
-void EEPROM_WriteDTC(void) {
-
-  uint8_t cmd[3];
-  EEPROM_WriteEnable();
-  cmd[0] = EEPROM_CMD_WRITE;
-  cmd[1] = (EEPROM_DTC_ADDR >> 8) & 0xFF;
-  cmd[2] = EEPROM_DTC_ADDR & 0xFF;
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-  is_spi_busy = 1;
-  HAL_SPI_Transmit_DMA(&hspi1, cmd, 3);
-  while(is_spi_busy);
-  is_spi_busy = 1;
-  HAL_SPI_Transmit_DMA(&hspi1, (uint8_t*)&dtclst, sizeof(dtclst));
-  while(is_spi_busy);
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
-}
-
-void EEPROM_ReadDTC(void) {
-  uint8_t cmd[3];
-  cmd[0] = EEPROM_CMD_READ;
-  cmd[1] = (EEPROM_DTC_ADDR >> 8) & 0xFF;
-  cmd[2] = EEPROM_DTC_ADDR & 0xFF;
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-  is_spi_busy = 1;
-  HAL_SPI_Transmit_DMA(&hspi1, cmd, 3);
-  while(is_spi_busy);
-  is_spi_busy = 1;
-  HAL_SPI_Receive_DMA(&hspi1, (uint8_t*)&dtclst, sizeof(dtclst));
-  while(is_spi_busy);
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
-}
-
-void Process_CAN_Response(CANData_t data) {
-
-  CAN_TxHeaderTypeDef TxHeader;
-  uint32_t TxMailbox;
-  uint8_t TxData[8] = {0};
-
-  TxHeader.StdId = 0x7E8; // 응답 ID
-  TxHeader.IDE = CAN_ID_STD;
-  TxHeader.RTR = CAN_RTR_DATA;
-  TxHeader.DLC = 8;
-
-  int index = 2;
-
-  // OBD2 0x43: Read DTCs
-  if (data.field.sid == 0x03) {
-
-	  TxData[1] = 0x43;
-	  if(dtclst[UVinDTC].active == 1){
-		  TxData[index] = (dtclst[UVinDTC].DTC_Code >> 8) & 0xFF;
-		  index++;
-		  TxData[index] = dtclst[UVinDTC].DTC_Code & 0xFF;
-		  index++;
-	  }
-	  if(dtclst[OVinDTC].active == 1){
-		  TxData[index] = (dtclst[OVinDTC].DTC_Code >> 8) & 0xFF;
-		  index++;
-		  TxData[index] = dtclst[OVinDTC].DTC_Code & 0xFF;
-		  index++;
-	  }
-	  if(dtclst[OCinDTC].active == 1){
-		  TxData[index] = (dtclst[OCinDTC].DTC_Code >> 8) & 0xFF;
-		  index++;
-		  TxData[index] = dtclst[OCinDTC].DTC_Code & 0xFF;
-		  index++;
-	  }
-  }
-  // OBD2 0x04: Clear DTCs
-  else if (data.field.sid == 0x04) {
-	for(int i = 0; i < MAX_DTC_NUM; i++){
-		dtclst[i].active = 0;
-	}
-	EEPROM_WriteDTC();
-    TxData[1] = 0x44;// 응답
-  }
-  // UDS 0x19: Read DTCs
-  else if (data.field.sid == 0x19) {
-
-	  TxData[1] = 0x59;
-	  if(dtclst[UVinDTC].active == 1){
-		  TxData[index] = (dtclst[UVinDTC].DTC_Code >> 8) & 0xFF;
-		  index++;
-		  TxData[index] = dtclst[UVinDTC].DTC_Code & 0xFF;
-		  index++;
-	  }
-	  if(dtclst[OVinDTC].active == 1){
-		  TxData[index] = (dtclst[OVinDTC].DTC_Code >> 8) & 0xFF;
-		  index++;
-		  TxData[index] = dtclst[OVinDTC].DTC_Code & 0xFF;
-		  index++;
-	  }
-	  if(dtclst[OCinDTC].active == 1){
-		  TxData[index] = (dtclst[OCinDTC].DTC_Code >> 8) & 0xFF;
-		  index++;
-		  TxData[index] = dtclst[OCinDTC].DTC_Code & 0xFF;
-		  index++;
-	  }
-  }
-  // UDS 0x14: Clear DTCs
-  else if (data.field.sid == 0x14) {
-	for(int i = 0; i < MAX_DTC_NUM; i++){
-		dtclst[i].active = 0;
-	}
-	EEPROM_WriteDTC();
-    TxData[1] = 0x54; // 응답
-  }
-  else
-  {
-	/* for misra code*/
-  }
-
-  HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
-}
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
@@ -882,19 +625,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
   }
 }
 
-void PMIC_Vref_Change(uint16_t v_ref_set){
 
-	uint8_t v_ref_temp = 0;
-
-    HAL_I2C_Mem_Read(&hi2c1, PMIC_I2C_ADDR, PMIC_V_REFA_HIGH, I2C_MEMADD_SIZE_8BIT, &v_ref_temp, 1, HAL_MAX_DELAY);
-    v_ref_temp = (v_ref_temp & 0xFC) | (uint8_t)(v_ref_set >> 8);
-	HAL_I2C_Mem_Write(&hi2c1, PMIC_I2C_ADDR, PMIC_V_REFA_HIGH, I2C_MEMADD_SIZE_8BIT, &v_ref_temp, 1, HAL_MAX_DELAY);
-
-	v_ref_temp = v_ref_set & 0xFF;
-
-	HAL_I2C_Mem_Write(&hi2c1, PMIC_I2C_ADDR, PMIC_V_REFA_LOW, I2C_MEMADD_SIZE_8BIT, &v_ref_temp, 1, HAL_MAX_DELAY);
-
-}
 /* USER CODE END 4 */
 
 /**

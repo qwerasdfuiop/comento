@@ -1,3 +1,7 @@
+"./Core/Src/DTC.o"
+"./Core/Src/EEPROM.o"
+"./Core/Src/OBD2UDS.o"
+"./Core/Src/PMIC.o"
 "./Core/Src/main.o"
 "./Core/Src/stm32f4xx_hal_msp.o"
 "./Core/Src/stm32f4xx_it.o"

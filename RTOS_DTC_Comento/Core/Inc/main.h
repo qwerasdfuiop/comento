@@ -32,7 +32,9 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+extern I2C_HandleTypeDef hi2c1;
+extern SPI_HandleTypeDef hspi1;
+extern CAN_HandleTypeDef hcan1;
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/

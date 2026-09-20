@@ -1,0 +1,2 @@
+../Core/Src/PMIC.c:15:6:PMIC_Read_Fault	3
+../Core/Src/PMIC.c:30:6:PMIC_Vref_Change	1
