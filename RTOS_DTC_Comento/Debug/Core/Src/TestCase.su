@@ -1,4 +1,7 @@
-../Core/Src/TestCase.c:9:6:TestCase_RunAll	8	static
-../Core/Src/TestCase.c:16:6:Test_PrintResult	104	static
-../Core/Src/TestCase.c:27:12:WB_TC01_FaultBitDecode	16	static
-../Core/Src/TestCase.c:49:12:WB_TC02_FaultToDTC	16	static
+../Core/Src/TestCase.c:10:6:TestCase_RunAll	8	static
+../Core/Src/TestCase.c:19:6:Test_PrintResult	104	static
+../Core/Src/TestCase.c:30:12:WB_TC01_FaultBitDecode	16	static
+../Core/Src/TestCase.c:52:12:WB_TC02_FaultToDTC	16	static
+../Core/Src/TestCase.c:85:13:BB_ResetFaults	16	static
+../Core/Src/TestCase.c:96:12:BB_TC01_ReadDtcResponse	24	static
+../Core/Src/TestCase.c:117:12:BB_TC02_UnsupportedSubFunction	24	static

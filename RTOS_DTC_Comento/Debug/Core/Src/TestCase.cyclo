@@ -1,4 +1,7 @@
-../Core/Src/TestCase.c:9:6:TestCase_RunAll	1
-../Core/Src/TestCase.c:16:6:Test_PrintResult	2
-../Core/Src/TestCase.c:27:12:WB_TC01_FaultBitDecode	4
-../Core/Src/TestCase.c:49:12:WB_TC02_FaultToDTC	7
+../Core/Src/TestCase.c:10:6:TestCase_RunAll	1
+../Core/Src/TestCase.c:19:6:Test_PrintResult	2
+../Core/Src/TestCase.c:30:12:WB_TC01_FaultBitDecode	4
+../Core/Src/TestCase.c:52:12:WB_TC02_FaultToDTC	7
+../Core/Src/TestCase.c:85:13:BB_ResetFaults	2
+../Core/Src/TestCase.c:96:12:BB_TC01_ReadDtcResponse	2
+../Core/Src/TestCase.c:117:12:BB_TC02_UnsupportedSubFunction	2

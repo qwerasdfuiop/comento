@@ -2,6 +2,7 @@
 #include "TestCase.h"
 #include "PMIC.h"
 #include "DTC.h"
+#include "OBD2UDS.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -10,6 +11,8 @@ void TestCase_RunAll(void)
 {
     Test_PrintResult("WB-01 Fault bit decode",WB_TC01_FaultBitDecode());
     Test_PrintResult("WB-02 Fault to DTC",WB_TC02_FaultToDTC());
+    Test_PrintResult("BB-01 Read DTC",BB_TC01_ReadDtcResponse());
+    Test_PrintResult("BB-02 Unsupported Sub Function",BB_TC02_UnsupportedSubFunction());
 }
 
 //각 테스트 케이스 함수 실행 결과 출력 함수
@@ -76,5 +79,54 @@ TestResult WB_TC02_FaultToDTC(void)
     	return TEST_FAIL;
     }
 
+    return TEST_PASS;
+}
+
+static void BB_ResetFaults(void)
+{
+    voltage_reg_buff.raw = 0;
+    current_reg_buff.raw = 0;
+    for (int i = 0; i < MAX_DTC_NUM; i++) {
+        dtclst[i].active = 0;
+    }
+    bb_tx_seen = 0;
+}
+
+/* OV 고장 후 ReadDTC(0x19 02 01) 응답이 규격 프레임인지 */
+TestResult BB_TC01_ReadDtcResponse(void)
+{
+    CANData_t req = {0};
+    const uint8_t expect[] = {0x59, 0x02, 0x01, 0x34, 0x56, 0x01};
+
+    BB_ResetFaults();
+    voltage_reg_buff.raw = 0x10; /* 상위 니블 OV */
+    DTCProcessFault();
+
+    req.read_request.sid = 0x19;
+    req.read_request.sub_func = 0x02;
+    req.read_request.status_mask = 0x01;
+    Process_CAN_Response(req);
+
+    if (memcmp(&bb_tx_data[1], expect, sizeof(expect)) != 0) {
+        return TEST_FAIL;
+    }
+    return TEST_PASS;
+}
+
+/* 지원하지 않는 sub-function이면 NRC 0x12 */
+TestResult BB_TC02_UnsupportedSubFunction(void)
+{
+    CANData_t req = {0};
+    const uint8_t expect[] = {0x7F, 0x19, 0x12};
+
+    BB_ResetFaults();
+    req.read_request.sid = 0x19;
+    req.read_request.sub_func = 0xFF;
+    req.read_request.status_mask = 0x01;
+    Process_CAN_Response(req);
+
+    if (memcmp(&bb_tx_data[1], expect, sizeof(expect)) != 0) {
+        return TEST_FAIL;
+    }
     return TEST_PASS;
 }

@@ -17,5 +17,9 @@ TestResult WB_TC01_FaultBitDecode(void);
 
 TestResult WB_TC02_FaultToDTC(void);
 
+TestResult BB_TC01_ReadDtcResponse(void);
+
+TestResult BB_TC02_UnsupportedSubFunction(void);
+
 #endif
 #endif
