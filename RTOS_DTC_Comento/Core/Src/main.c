@@ -80,6 +80,22 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
+osMutexId_t CommMutexHandle;
+const osMutexAttr_t CommMutex_attributes = {
+  .name = "CommMutex"
+};
+osThreadId_t Task_1msHandle;
+const osThreadAttr_t Task_1ms_attributes = {
+  .name = "Task_1ms",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal,
+};
+osThreadId_t Task_5msHandle;
+const osThreadAttr_t Task_5ms_attributes = {
+  .name = "Task_5ms",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
 
 //volatile uint8_t can_head = 0, can_tail = 0;
 
@@ -97,7 +113,8 @@ static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_UART4_Init(void);
 void StartDefaultTask(void *argument);
-
+void StartTask_1ms(void *argument);
+void StartTask_5ms(void *argument);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -165,6 +182,7 @@ int main(void)
 #endif
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
+  CommMutexHandle = osMutexNew(&CommMutex_attributes);
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
@@ -182,7 +200,8 @@ int main(void)
   /* Create the thread(s) */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-
+  Task_1msHandle = osThreadNew(StartTask_1ms, NULL, &Task_1ms_attributes);
+  Task_5msHandle = osThreadNew(StartTask_5ms, NULL, &Task_5ms_attributes);
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -634,7 +653,51 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
     can_rx_flag = 1;
   }
 }
+void StartTask_1ms(void *argument)
+{
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  for (;;)
+  {
+    vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
+    if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(1)) == osOK)
+    {
+      PMIC_Read_Fault();
+      DTCProcessFault();
+      if (can_rx_flag) {
+        can_rx_flag = 0;
+        Process_CAN_Response(data);
+      }
+      osMutexRelease(CommMutexHandle);
+    }
+  }
+}
+void StartTask_5ms(void *argument)
+{
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  const char msg1[] = "ECU System Running\r\n";
+  const char msg2[] = "ECU System Went Wrong\r\n";
 
+  for (;;)
+  {
+    vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(5));
+
+    if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(5)) == osOK)
+    {
+      int err_count = 0;
+      for (int i = 0; i < MAX_DTC_NUM; i++) {
+        if (dtclst[i].active == 1) {
+          HAL_UART_Transmit(&huart4, (uint8_t *)msg2, strlen(msg2), HAL_MAX_DELAY);
+          err_count++;
+        }
+      }
+      if (err_count == 0) {
+        HAL_UART_Transmit(&huart4, (uint8_t *)msg1, strlen(msg1), HAL_MAX_DELAY);
+      }
+
+      osMutexRelease(CommMutexHandle);
+    }
+  }
+}
 
 /* USER CODE END 4 */
 

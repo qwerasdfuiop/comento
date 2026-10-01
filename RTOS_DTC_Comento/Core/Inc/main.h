@@ -36,6 +36,7 @@ extern I2C_HandleTypeDef hi2c1;
 extern SPI_HandleTypeDef hspi1;
 extern CAN_HandleTypeDef hcan1;
 extern UART_HandleTypeDef huart4;
+extern ADC_HandleTypeDef hadc1;
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
