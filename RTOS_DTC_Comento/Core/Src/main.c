@@ -39,6 +39,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define PMIC_CH1_UVLO_ADC  1117U  /* 0.9V, 3.3V 기준 */
+#define PMIC_CH1_OV_ADC    1365U  /* 1.1V */
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -172,7 +175,13 @@ int main(void)
 #else
   //전원이 꺼지기 전 EEPROM에 저장된 DTC 정보 읽기
   EEPROM_ReadDTC();
-
+  dtclst[UVinDTC].DTC_Code = UV;
+  dtclst[OVinDTC].DTC_Code = OV;
+  dtclst[OCinDTC].DTC_Code = OC;
+  dtclst[BRAKE_UVLOinDTC].DTC_Code = BRAKE_UVLO;
+  if (dtclst[BRAKE_UVLOinDTC].active != 1) {
+    dtclst[BRAKE_UVLOinDTC].active = 0;
+}
   //PMIC의 VREF 값 설정
   PMIC_Vref_Change(v_ref_set);
   /* USER CODE END 2 */
@@ -199,7 +208,7 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  //defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
   Task_1msHandle = osThreadNew(StartTask_1ms, NULL, &Task_1ms_attributes);
   Task_5msHandle = osThreadNew(StartTask_5ms, NULL, &Task_5ms_attributes);
   /* USER CODE BEGIN RTOS_THREADS */
@@ -683,6 +692,17 @@ void StartTask_5ms(void *argument)
 
     if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(5)) == osOK)
     {
+      HAL_ADC_Start(&hadc1);
+      if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
+          uint16_t adc_val = HAL_ADC_GetValue(&hadc1);
+          if ((adc_val < PMIC_CH1_UVLO_ADC) || (adc_val > PMIC_CH1_OV_ADC)) {
+              if (dtclst[BRAKE_UVLOinDTC].active == 0) {
+                  dtclst[BRAKE_UVLOinDTC].active = 1;
+                  EEPROM_WriteDTC();
+              }
+          }
+      }
+      HAL_ADC_Stop(&hadc1);
       int err_count = 0;
       for (int i = 0; i < MAX_DTC_NUM; i++) {
         if (dtclst[i].active == 1) {

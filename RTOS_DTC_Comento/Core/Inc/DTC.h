@@ -2,14 +2,14 @@
 #define DTC_H_
 
 //DTC 고장 코드 종류 개수
-#define MAX_DTC_NUM 3
+#define MAX_DTC_NUM 4
 
 // DTC Code 종류
 enum DTC_Code_t {
 	UV = 0x1234,
 	OV = 0x3456,
 	OC = 0x5678,
-	//HIGH_TEMP = 0x4567
+	BRAKE_UVLO = 0x5101,
 };
 
 #pragma pack(push, 1)
@@ -28,7 +28,7 @@ enum DTC_Index_t {
 	UVinDTC = 0,
 	OVinDTC = 1,
 	OCinDTC = 2,
-	//HIGH_TEMPinDTC = 3
+	BRAKE_UVLOinDTC = 3,
 };
 
 extern DTC_t dtclst[MAX_DTC_NUM];

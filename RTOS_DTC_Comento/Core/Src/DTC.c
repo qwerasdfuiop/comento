@@ -9,7 +9,7 @@ DTC_t dtclst[MAX_DTC_NUM] = {
 		{UV, 0},
 		{OV, 0},
 		{OC, 0},
-		//{HIGH_TEMP, 0},
+		{BRAKE_UVLO, 0},
 };
 
 //PMIC 레지스터 버퍼로부터 DTC로 변환하는 함수

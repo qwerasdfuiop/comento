@@ -39,24 +39,23 @@ void Process_CAN_Response(CANData_t data) {
 			TxData[2] = 0x02;
 			TxData[3] = 0x01;
 			if(dtclst[UVinDTC].active == 1){
-				TxData[index] = (dtclst[UVinDTC].DTC_Code >> 8) & 0xFF;
-				index++;
-				TxData[index] = dtclst[UVinDTC].DTC_Code & 0xFF;
-				index++;
+				TxData[index++] = (dtclst[UVinDTC].DTC_Code >> 8) & 0xFF;
+				TxData[index++] = dtclst[UVinDTC].DTC_Code & 0xFF;
 				TxData[index] = 0x01;
 			}
 			else if(dtclst[OVinDTC].active == 1){
-				TxData[index] = (dtclst[OVinDTC].DTC_Code >> 8) & 0xFF;
-				index++;
-				TxData[index] = dtclst[OVinDTC].DTC_Code & 0xFF;
-				index++;
+				TxData[index++] = (dtclst[OVinDTC].DTC_Code >> 8) & 0xFF;
+				TxData[index++] = dtclst[OVinDTC].DTC_Code & 0xFF;
 				TxData[index] = 0x01;
 			}
 			else if(dtclst[OCinDTC].active == 1){
-				TxData[index] = (dtclst[OCinDTC].DTC_Code >> 8) & 0xFF;
-				index++;
-				TxData[index] = dtclst[OCinDTC].DTC_Code & 0xFF;
-				index++;
+				TxData[index++] = (dtclst[OCinDTC].DTC_Code >> 8) & 0xFF;
+				TxData[index++] = dtclst[OCinDTC].DTC_Code & 0xFF;
+				TxData[index] = 0x01;
+			}
+			else if (dtclst[BRAKE_UVLOinDTC].active == 1) {
+				TxData[index++] = (dtclst[BRAKE_UVLOinDTC].DTC_Code >> 8) & 0xFF;
+				TxData[index++] = dtclst[BRAKE_UVLOinDTC].DTC_Code & 0xFF;
 				TxData[index] = 0x01;
 			}
 			else{
