@@ -29,11 +29,11 @@ void EEPROM_WriteDTC(void) {
   // 명령 전송
   is_spi_busy = 1;
   HAL_SPI_Transmit_DMA(&hspi1, cmd, 3);
-  while(is_spi_busy);
+  osSemaphoreAcquire(spiDoneHandle, 100);
   // DTC 정보 전송
   is_spi_busy = 1;
   HAL_SPI_Transmit_DMA(&hspi1, (uint8_t*)&dtclst, sizeof(dtclst));
-  while(is_spi_busy);
+  osSemaphoreAcquire(spiDoneHandle, 100);
   // PMIC Slave 통신 종료
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
 }
@@ -50,11 +50,11 @@ void EEPROM_ReadDTC(void) {
   // 명령 전송
   is_spi_busy = 1;
   HAL_SPI_Transmit_DMA(&hspi1, cmd, 3);
-  while(is_spi_busy);
+  osSemaphoreAcquire(spiDoneHandle, 100);
   // DTC 정보 읽기
   is_spi_busy = 1;
   HAL_SPI_Receive_DMA(&hspi1, (uint8_t*)&dtclst, sizeof(dtclst));
-  while(is_spi_busy);
+  osSemaphoreAcquire(spiDoneHandle, 100);
   // PMIC Slave 통신 종료
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
 }

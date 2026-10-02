@@ -29,6 +29,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_hal.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -37,6 +38,9 @@ extern SPI_HandleTypeDef hspi1;
 extern CAN_HandleTypeDef hcan1;
 extern UART_HandleTypeDef huart4;
 extern ADC_HandleTypeDef hadc1;
+
+extern osSemaphoreId_t spiDoneHandle;
+extern osSemaphoreId_t i2cDoneHandle;
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/

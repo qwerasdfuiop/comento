@@ -100,7 +100,10 @@ const osThreadAttr_t Task_5ms_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 
-//volatile uint8_t can_head = 0, can_tail = 0;
+osSemaphoreId_t spiDoneHandle;
+osSemaphoreId_t i2cDoneHandle;
+const osSemaphoreAttr_t spiDone_attributes = { .name = "spiDone" };
+const osSemaphoreAttr_t i2cDone_attributes = { .name = "i2cDone" };
 
 /* USER CODE END PV */
 
@@ -181,7 +184,7 @@ int main(void)
   dtclst[BRAKE_UVLOinDTC].DTC_Code = BRAKE_UVLO;
   if (dtclst[BRAKE_UVLOinDTC].active != 1) {
     dtclst[BRAKE_UVLOinDTC].active = 0;
-}
+  }
   //PMIC의 VREF 값 설정
   PMIC_Vref_Change(v_ref_set);
   /* USER CODE END 2 */
@@ -196,6 +199,10 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
+
+
+  spiDoneHandle = osSemaphoreNew(1, 0, &spiDone_attributes);
+  i2cDoneHandle = osSemaphoreNew(1, 0, &i2cDone_attributes);
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -643,14 +650,21 @@ static void MX_GPIO_Init(void)
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
   if (hi2c->Instance == I2C1) {
-    is_i2c_busy = 0;
+    osSemaphoreRelease(i2cDoneHandle);
   }
 }
 //I2C 송신 콜백(is_i2c_busy 플래그 0 초기화)
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   if (hspi->Instance == SPI1) {
-    is_spi_busy = 0;
+    osSemaphoreRelease(spiDoneHandle);
+  }
+}
+//I2C 수신 콜백(is_i2c_busy 플래그 0 초기화)
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+  if (hspi->Instance == SPI1) {
+      osSemaphoreRelease(spiDoneHandle);
   }
 }
 //CAN 수신 콜백(FIFO로부터 data 변수에 payload 저장 후 can_rx_flag = 1 초기화

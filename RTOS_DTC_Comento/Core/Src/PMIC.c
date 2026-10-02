@@ -17,11 +17,11 @@ void PMIC_Read_Fault(void){
 
 	is_i2c_busy = 1;
 	HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, VOLTAGE_FAULT_ADDR, I2C_MEMADD_SIZE_8BIT, &voltage_reg_buff.raw, 1);
-	while(is_i2c_busy);
+	osSemaphoreAcquire(i2cDoneHandle, 100);
 
 	is_i2c_busy = 1;
 	HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, CURRENT_FAULT_ADDR, I2C_MEMADD_SIZE_8BIT, &current_reg_buff.raw, 1);
-	while(is_i2c_busy);
+	osSemaphoreAcquire(i2cDoneHandle, 100);
 
 //	is_i2c_busy = 1;
 //	HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, TEMPERATURE_FAULT_ADDR, I2C_MEMADD_SIZE_8BIT, &temperature_reg_buff.raw, 1);
