@@ -30,6 +30,7 @@
 #include "EEPROM.h"
 #include "OBD2UDS.h"
 #include "TestCase.h"
+#include "BTS7008.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -168,6 +169,7 @@ int main(void)
   HAL_CAN_Start(&hcan1);
   HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 
+  BTS7008_Init();
 // #if TEST_CASE
 //   TestCase_RunAll();
 // #else
@@ -178,9 +180,13 @@ int main(void)
   dtclst[OVinDTC].DTC_Code = OV;
   dtclst[OCinDTC].DTC_Code = OC;
   dtclst[BRAKE_UVLOinDTC].DTC_Code = BRAKE_UVLO;
+  dtclst[BTS7008_FAULTinDTC].DTC_Code = BTS7008_CH0_FAULT;
   if (dtclst[BRAKE_UVLOinDTC].active != 1) {
     dtclst[BRAKE_UVLOinDTC].active = 0;
   }
+  if (dtclst[BTS7008_FAULTinDTC].active != 1) {
+    dtclst[BTS7008_FAULTinDTC].active = 0;
+}
   //PMIC의 VREF 값 설정
   PMIC_Vref_Change(v_ref_set);
   /* USER CODE END 2 */
@@ -748,21 +754,31 @@ void StartTask_5ms(void *argument)
 	{
 	  HAL_ADC_Start(&hadc1);
 	  if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
-		  uint16_t adc_val = HAL_ADC_GetValue(&hadc1);
-		  if ((adc_val < PMIC_CH1_UVLO_ADC) || (adc_val > PMIC_CH1_OV_ADC)) {
+		  uint16_t pmic_adc_val = HAL_ADC_GetValue(&hadc1);
+		  if ((pmic_adc_val < PMIC_CH1_UVLO_ADC) || (pmic_adc_val > PMIC_CH1_OV_ADC)) {
 			  if (dtclst[BRAKE_UVLOinDTC].active == 0) {
 				  dtclst[BRAKE_UVLOinDTC].active = 1;
 				  EEPROM_WriteDTC();
 			  }
 		  }
 	  }
+    if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
+		  uint16_t bts_adc_val = HAL_ADC_GetValue(&hadc1);
+		  if (BTS7008_CheckFault(bts_adc_val) == BTS7008_DIAG_FAULT) {
+			  if (dtclst[BTS7008_FAULTinDTC].active == 0) {
+				  dtclst[BTS7008_FAULTinDTC].active = 1;
+				  EEPROM_WriteDTC();
+			  }
+        BTS7008_SetOutput(0);
+		  }
+	  }
 	  HAL_ADC_Stop(&hadc1);
 	  int err_count = 0;
 	  for (int i = 0; i < MAX_DTC_NUM; i++) {
-		if (dtclst[i].active == 1) {
-		  HAL_UART_Transmit(&huart4, (uint8_t *)msg2, strlen(msg2), HAL_MAX_DELAY);
-		  err_count++;
-		}
+      if (dtclst[i].active == 1) {
+        HAL_UART_Transmit(&huart4, (uint8_t *)msg2, strlen(msg2), HAL_MAX_DELAY);
+        err_count++;
+      }
 	  }
 	  if (err_count == 0) {
 		HAL_UART_Transmit(&huart4, (uint8_t *)msg1, strlen(msg1), HAL_MAX_DELAY);
