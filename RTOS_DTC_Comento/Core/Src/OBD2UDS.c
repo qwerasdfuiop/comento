@@ -58,6 +58,11 @@ void Process_CAN_Response(CANData_t data) {
 				TxData[index++] = dtclst[BRAKE_UVLOinDTC].DTC_Code & 0xFF;
 				TxData[index] = 0x01;
 			}
+			else if (dtclst[BTS7008_FAULTinDTC].active == 1) {
+				TxData[index++] = (dtclst[BTS7008_FAULTinDTC].DTC_Code >> 8) & 0xFF;
+				TxData[index++] = dtclst[BTS7008_FAULTinDTC].DTC_Code & 0xFF;
+				TxData[index] = 0x01;
+			}
 			else{
                 /* for misra code*/
 			}
