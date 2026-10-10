@@ -144,16 +144,14 @@ Discarded input sections
                 0x00000000       0x2c ./Core/Src/BTS7008.o
  .text.BTS7008_SetOutput
                 0x00000000       0x2c ./Core/Src/BTS7008.o
- .text.BTS7008_DiagnoeEnable
-                0x00000000       0x2c ./Core/Src/BTS7008.o
  .text.BTS7008_CheckFault
-                0x00000000       0x64 ./Core/Src/BTS7008.o
- .debug_info    0x00000000      0x273 ./Core/Src/BTS7008.o
- .debug_abbrev  0x00000000      0x153 ./Core/Src/BTS7008.o
+                0x00000000       0x70 ./Core/Src/BTS7008.o
+ .debug_info    0x00000000      0x252 ./Core/Src/BTS7008.o
+ .debug_abbrev  0x00000000      0x151 ./Core/Src/BTS7008.o
  .debug_aranges
-                0x00000000       0x38 ./Core/Src/BTS7008.o
+                0x00000000       0x30 ./Core/Src/BTS7008.o
  .debug_rnglists
-                0x00000000       0x25 ./Core/Src/BTS7008.o
+                0x00000000       0x1f ./Core/Src/BTS7008.o
  .debug_macro   0x00000000      0x37b ./Core/Src/BTS7008.o
  .debug_macro   0x00000000      0xad8 ./Core/Src/BTS7008.o
  .debug_macro   0x00000000      0x2b3 ./Core/Src/BTS7008.o
@@ -230,11 +228,11 @@ Discarded input sections
  .debug_macro   0x00000000       0x74 ./Core/Src/BTS7008.o
  .debug_macro   0x00000000       0xdd ./Core/Src/BTS7008.o
  .debug_macro   0x00000000       0x34 ./Core/Src/BTS7008.o
- .debug_macro   0x00000000       0x22 ./Core/Src/BTS7008.o
- .debug_line    0x00000000      0xad8 ./Core/Src/BTS7008.o
+ .debug_macro   0x00000000       0x28 ./Core/Src/BTS7008.o
+ .debug_line    0x00000000      0xac4 ./Core/Src/BTS7008.o
  .debug_str     0x00000000    0xdf1a6 ./Core/Src/BTS7008.o
  .comment       0x00000000       0x44 ./Core/Src/BTS7008.o
- .debug_frame   0x00000000       0x98 ./Core/Src/BTS7008.o
+ .debug_frame   0x00000000       0x74 ./Core/Src/BTS7008.o
  .ARM.attributes
                 0x00000000       0x34 ./Core/Src/BTS7008.o
  .group         0x00000000        0xc ./Core/Src/DTC.o

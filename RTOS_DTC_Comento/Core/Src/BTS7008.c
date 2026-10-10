@@ -36,21 +36,11 @@ void BTS7008_SetOutput(uint8_t state)
     );
 }
 
-void BTS7008_DiagnoeEnable(uint8_t state)
-{
-    HAL_GPIO_WritePin(
-        BTS_DEN_GPIO_Port,
-        BTS_DEN_Pin,
-        state
-            ? GPIO_PIN_SET
-            : GPIO_PIN_RESET
-    );
-}
 
 BTS7008_DiagState BTS7008_CheckFault(uint16_t adc_value)
 {
 
-    float vis_value = adc_value * BTS7008_VIS_SCALE / RESOLUTION_LEVEL_MAX;
+    float vis_value = adc_value * BTS7008_VIS_SCALE * BTS7008_ADC_VREF / RESOLUTION_LEVEL_MAX;
     float iis_value = vis_value / BTS7008_RSENSE_OHM;
     if (iis_value >= BTS7008_FAULT_IIS_THRESHOLD) {
         return BTS7008_DIAG_FAULT;

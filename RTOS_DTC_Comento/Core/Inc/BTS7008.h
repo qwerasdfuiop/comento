@@ -11,6 +11,7 @@
 #define BTS7008_VIS_SCALE         2.0f
 #define BTS7008_RSENSE_OHM        1200.0f
 #define RESOLUTION_LEVEL_MAX      4095U
+#define BTS7008_ADC_VREF              3.3f
 
 typedef enum {
     BTS7008_DIAG_NORMAL = 0,
