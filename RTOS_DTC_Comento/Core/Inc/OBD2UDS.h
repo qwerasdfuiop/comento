@@ -22,7 +22,7 @@ extern CANData_t data;
 // 인터럽트 완료 확인을 위한 플래그 변수
 extern volatile uint8_t can_rx_flag;
 
-#ifdef TEST_CASE
+#if TEST_CASE
 extern uint8_t bb_tx_data[8];
 extern CAN_TxHeaderTypeDef bb_tx_header;
 extern uint8_t bb_tx_seen;

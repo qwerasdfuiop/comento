@@ -29,10 +29,10 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_hal.h"
-#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "cmsis_os.h"
 extern I2C_HandleTypeDef hi2c1;
 extern SPI_HandleTypeDef hspi1;
 extern CAN_HandleTypeDef hcan1;
@@ -66,6 +66,14 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define BTS_IS_ADC_Pin GPIO_PIN_3
+#define BTS_IS_ADC_GPIO_Port GPIOA
+#define BTS_IN0_Pin GPIO_PIN_2
+#define BTS_IN0_GPIO_Port GPIOG
+#define BTS_DEN_Pin GPIO_PIN_3
+#define BTS_DEN_GPIO_Port GPIOG
+#define BTS_DSEL_Pin GPIO_PIN_4
+#define BTS_DSEL_GPIO_Port GPIOG
 
 /* USER CODE BEGIN Private defines */
 

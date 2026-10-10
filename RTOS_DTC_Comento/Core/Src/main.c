@@ -75,29 +75,24 @@ DMA_HandleTypeDef hdma_spi2_tx;
 
 UART_HandleTypeDef huart4;
 
-/* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* USER CODE BEGIN PV */
-osMutexId_t CommMutexHandle;
-const osMutexAttr_t CommMutex_attributes = {
-  .name = "CommMutex"
-};
+/* Definitions for Task_1ms */
 osThreadId_t Task_1msHandle;
 const osThreadAttr_t Task_1ms_attributes = {
   .name = "Task_1ms",
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityAboveNormal,
 };
+/* Definitions for Task_5ms */
 osThreadId_t Task_5msHandle;
 const osThreadAttr_t Task_5ms_attributes = {
   .name = "Task_5ms",
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
+};
+/* USER CODE BEGIN PV */
+osMutexId_t CommMutexHandle;
+const osMutexAttr_t CommMutex_attributes = {
+  .name = "CommMutex"
 };
 
 osSemaphoreId_t spiDoneHandle;
@@ -118,9 +113,9 @@ static void MX_I2C2_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_UART4_Init(void);
-void StartDefaultTask(void *argument);
 void StartTask_1ms(void *argument);
 void StartTask_5ms(void *argument);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -173,9 +168,10 @@ int main(void)
   HAL_CAN_Start(&hcan1);
   HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 
-#ifdef TEST_CASE
-  TestCase_RunAll();
-#else
+// #if TEST_CASE
+//   TestCase_RunAll();
+// #else
+// #endif
   //전원이 꺼지기 전 EEPROM에 저장된 DTC 정보 읽기
   EEPROM_ReadDTC();
   dtclst[UVinDTC].DTC_Code = UV;
@@ -191,7 +187,7 @@ int main(void)
 
   /* Init scheduler */
   osKernelInitialize();
-#endif
+
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
   CommMutexHandle = osMutexNew(&CommMutex_attributes);
@@ -214,10 +210,12 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of defaultTask */
-  //defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  /* creation of Task_1ms */
   Task_1msHandle = osThreadNew(StartTask_1ms, NULL, &Task_1ms_attributes);
+
+  /* creation of Task_5ms */
   Task_5msHandle = osThreadNew(StartTask_5ms, NULL, &Task_5ms_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -309,13 +307,13 @@ static void MX_ADC1_Init(void)
   hadc1.Instance = ADC1;
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.ScanConvMode = DISABLE;
+  hadc1.Init.ScanConvMode = ENABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.NbrOfConversion = 2;
   hadc1.Init.DMAContinuousRequests = DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
@@ -325,9 +323,18 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = 1;
   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Rank = 2;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -625,6 +632,9 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2, GPIO_PIN_SET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOG, BTS_IN0_Pin|BTS_DEN_Pin|BTS_DSEL_Pin, GPIO_PIN_RESET);
+
   /*Configure GPIO pins : PB0 PB1 */
   GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -638,6 +648,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : BTS_IN0_Pin BTS_DEN_Pin BTS_DSEL_Pin */
+  GPIO_InitStruct.Pin = BTS_IN0_Pin|BTS_DEN_Pin|BTS_DSEL_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -676,106 +693,85 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
     can_rx_flag = 1;
   }
 }
-void StartTask_1ms(void *argument)
-{
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  for (;;)
-  {
-    vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
-    if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(1)) == osOK)
-    {
-      PMIC_Read_Fault();
-      DTCProcessFault();
-      if (can_rx_flag) {
-        can_rx_flag = 0;
-        Process_CAN_Response(data);
-      }
-      osMutexRelease(CommMutexHandle);
-    }
-  }
-}
-void StartTask_5ms(void *argument)
-{
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  const char msg1[] = "ECU System Running\r\n";
-  const char msg2[] = "ECU System Went Wrong\r\n";
 
-  for (;;)
-  {
-    vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(5));
-
-    if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(5)) == osOK)
-    {
-      HAL_ADC_Start(&hadc1);
-      if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
-          uint16_t adc_val = HAL_ADC_GetValue(&hadc1);
-          if ((adc_val < PMIC_CH1_UVLO_ADC) || (adc_val > PMIC_CH1_OV_ADC)) {
-              if (dtclst[BRAKE_UVLOinDTC].active == 0) {
-                  dtclst[BRAKE_UVLOinDTC].active = 1;
-                  EEPROM_WriteDTC();
-              }
-          }
-      }
-      HAL_ADC_Stop(&hadc1);
-      int err_count = 0;
-      for (int i = 0; i < MAX_DTC_NUM; i++) {
-        if (dtclst[i].active == 1) {
-          HAL_UART_Transmit(&huart4, (uint8_t *)msg2, strlen(msg2), HAL_MAX_DELAY);
-          err_count++;
-        }
-      }
-      if (err_count == 0) {
-        HAL_UART_Transmit(&huart4, (uint8_t *)msg1, strlen(msg1), HAL_MAX_DELAY);
-      }
-
-      osMutexRelease(CommMutexHandle);
-    }
-  }
-}
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartDefaultTask */
+/* USER CODE BEGIN Header_StartTask_1ms */
 /**
-  * @brief  Function implementing the defaultTask thread.
+  * @brief  Function implementing the Task_1ms thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
+/* USER CODE END Header_StartTask_1ms */
+void StartTask_1ms(void *argument)
 {
   /* USER CODE BEGIN 5 */
+	TickType_t xLastWakeTime = xTaskGetTickCount();
+  /* Infinite loop */
+  for(;;)
+  {
+	vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
+	if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(1)) == osOK)
+	{
+	  PMIC_Read_Fault();
+	  DTCProcessFault();
+	  if (can_rx_flag) {
+		can_rx_flag = 0;
+		Process_CAN_Response(data);
+	  }
+	  osMutexRelease(CommMutexHandle);
+	}
+  }
+  /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartTask_5ms */
+/**
+* @brief Function implementing the Task_5ms thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTask_5ms */
+void StartTask_5ms(void *argument)
+{
+  /* USER CODE BEGIN StartTask_5ms */
+  TickType_t xLastWakeTime = xTaskGetTickCount();
   const char msg1[] = "ECU System Running\r\n";
   const char msg2[] = "ECU System Went Wrong\r\n";
   /* Infinite loop */
   for(;;)
   {
-    	//I2C DMA INTERRUPT 방식으로 UV 혹은 OV 혹은 OC 여부 READ
-	PMIC_Read_Fault();
+	vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(5));
 
-	//만일 UV 혹은 OV 가 있다면 EEPROM에 DTC를 WRITE
-	DTCProcessFault();
-
-	// CAN INTERRUPT 방식으로 UDS / OBD 메시지 송수신
-	if (can_rx_flag) {
-	  can_rx_flag = 0;
-	  Process_CAN_Response(data);
-	}
-
-	// uart 폴링 방식으로 메시지 출력. 고장이 있으면 고장 개수만큼 에러 메시지 출력. 고장이 없으면 정상 메시지 출력
-	int err_count = 0;
-	for(int i = 0; i < MAX_DTC_NUM; i++){
-		if(dtclst[i].active == 1){
-			HAL_UART_Transmit(&huart4, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
-			err_count++;
+	if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(5)) == osOK)
+	{
+	  HAL_ADC_Start(&hadc1);
+	  if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
+		  uint16_t adc_val = HAL_ADC_GetValue(&hadc1);
+		  if ((adc_val < PMIC_CH1_UVLO_ADC) || (adc_val > PMIC_CH1_OV_ADC)) {
+			  if (dtclst[BRAKE_UVLOinDTC].active == 0) {
+				  dtclst[BRAKE_UVLOinDTC].active = 1;
+				  EEPROM_WriteDTC();
+			  }
+		  }
+	  }
+	  HAL_ADC_Stop(&hadc1);
+	  int err_count = 0;
+	  for (int i = 0; i < MAX_DTC_NUM; i++) {
+		if (dtclst[i].active == 1) {
+		  HAL_UART_Transmit(&huart4, (uint8_t *)msg2, strlen(msg2), HAL_MAX_DELAY);
+		  err_count++;
 		}
+	  }
+	  if (err_count == 0) {
+		HAL_UART_Transmit(&huart4, (uint8_t *)msg1, strlen(msg1), HAL_MAX_DELAY);
+	  }
+
+	  osMutexRelease(CommMutexHandle);
 	}
-	if(err_count == 0){
-		HAL_UART_Transmit(&huart4, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
-	}
-    osDelay(10);
   }
-  /* USER CODE END 5 */
+  /* USER CODE END StartTask_5ms */
 }
 
 /**

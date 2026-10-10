@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#if TEST_CASE
+
 // 모든 테스트 케이스 실행 및 결과 출력
 void TestCase_RunAll(void)
 {
@@ -130,3 +132,4 @@ TestResult BB_TC02_UnsupportedSubFunction(void)
     }
     return TEST_PASS;
 }
+#endif

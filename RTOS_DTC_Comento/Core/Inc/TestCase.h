@@ -3,7 +3,7 @@
 
 #define TEST_CASE 0
 
-#ifdef TEST_CASE
+#if TEST_CASE
 typedef enum {
     TEST_PASS = 1,
     TEST_FAIL = 0

@@ -4,7 +4,7 @@
 #include "OBD2UDS.h"
 #include "TestCase.h"
 
-#ifdef TEST_CASE
+#if TEST_CASE
 uint8_t bb_tx_data[8];
 CAN_TxHeaderTypeDef bb_tx_header;
 uint8_t bb_tx_seen;
@@ -112,7 +112,7 @@ void Process_CAN_Response(CANData_t data) {
 // 	EEPROM_WriteDTC();
 //     TxData[1] = 0x44;// 응답
 
-#ifdef TEST_CASE
+#if TEST_CASE
 	bb_tx_header = TxHeader;
 	for (int i = 0; i < 8; i++) {
 	bb_tx_data[i] = TxData[i];
