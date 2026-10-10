@@ -1,3 +1,4 @@
+"./Core/Src/BTS7008.o"
 "./Core/Src/DTC.o"
 "./Core/Src/EEPROM.o"
 "./Core/Src/OBD2UDS.o"

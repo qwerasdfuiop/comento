@@ -1,0 +1,4 @@
+../Core/Src/BTS7008.c:4:6:BTS7008_Init	1
+../Core/Src/BTS7008.c:28:6:BTS7008_SetOutput	1
+../Core/Src/BTS7008.c:39:6:BTS7008_DiagnoeEnable	1
+../Core/Src/BTS7008.c:50:19:BTS7008_CheckFault	2

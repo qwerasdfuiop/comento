@@ -1,0 +1,28 @@
+#ifndef BTS7008_H_
+#define BTS7008_H_
+
+#include <stdint.h>
+
+/*
+ * Project assumption.
+ * 실제 HW에서는 IS-ADC 회로에 맞춰 결정해야 함.
+ */
+#define BTS7008_FAULT_ADC_THRESHOLD   3500U
+
+typedef enum {
+    BTS7008_OUTPUT_OFF = 0,
+    BTS7008_OUTPUT_ON
+} BTS7008_OutputState;
+
+typedef enum {
+    BTS7008_DIAG_NORMAL = 0,
+    BTS7008_DIAG_FAULT
+} BTS7008_DiagState;
+
+void BTS7008_Init(void);
+
+void BTS7008_SetOutput(BTS7008_OutputState state);
+
+BTS7008_DiagState BTS7008_CheckFault(uint16_t adc_value);
+
+#endif

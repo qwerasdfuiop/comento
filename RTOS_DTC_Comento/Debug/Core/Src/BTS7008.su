@@ -1,0 +1,4 @@
+../Core/Src/BTS7008.c:4:6:BTS7008_Init	8	static
+../Core/Src/BTS7008.c:28:6:BTS7008_SetOutput	16	static
+../Core/Src/BTS7008.c:39:6:BTS7008_DiagnoeEnable	16	static
+../Core/Src/BTS7008.c:50:19:BTS7008_CheckFault	24	static
