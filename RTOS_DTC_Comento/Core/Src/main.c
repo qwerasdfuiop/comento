@@ -753,6 +753,7 @@ void StartTask_5ms(void *argument)
 	if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(5)) == osOK)
 	{
 	  HAL_ADC_Start(&hadc1);
+    //PMIC UVLO 검사
 	  if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
 		  uint16_t pmic_adc_val = HAL_ADC_GetValue(&hadc1);
 		  if ((pmic_adc_val < PMIC_CH1_UVLO_ADC) || (pmic_adc_val > PMIC_CH1_OV_ADC)) {
@@ -762,6 +763,7 @@ void StartTask_5ms(void *argument)
 			  }
 		  }
 	  }
+    //BTS7008 FAULT 검사
     if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
 		  uint16_t bts_adc_val = HAL_ADC_GetValue(&hadc1);
 		  if (BTS7008_CheckFault(bts_adc_val) == BTS7008_DIAG_FAULT) {

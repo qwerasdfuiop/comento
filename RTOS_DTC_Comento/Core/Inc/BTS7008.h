@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 /*
- * Project assumption.
- * 실제 HW에서는 IS-ADC 회로에 맞춰 결정해야 함.
+ * 600옴 저항 2개로 전압 분압하여 ADC에 읽힌다고 가정
+ * CHANNEL을 ON한 상태에서 FAULT CURRENT 여부인지만 판단(OPEN LOAD 미구현)
  */
 #define BTS7008_FAULT_IIS_THRESHOLD   0.0044f
 #define BTS7008_VIS_SCALE         2.0f
@@ -20,8 +20,10 @@ typedef enum {
 
 void BTS7008_Init(void);
 
+//IN0핀 제어 함수
 void BTS7008_SetOutput(uint8_t state);
 
+//ADC값을 통해 FAULT 여부 계산
 BTS7008_DiagState BTS7008_CheckFault(uint16_t adc_value);
 
 #endif
