@@ -37,11 +37,11 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, READONLY, DEBUGGING, OCTETS
  16 .debug_macro  0002357a  00000000  00000000  00021e59  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 17 .debug_line   00015151  00000000  00000000  000453d3  2**0
+ 17 .debug_line   0001514f  00000000  00000000  000453d3  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 18 .debug_str    000d8aa4  00000000  00000000  0005a524  2**0
+ 18 .debug_str    000d8aa4  00000000  00000000  0005a522  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 19 .comment      00000043  00000000  00000000  00132fc8  2**0
+ 19 .comment      00000043  00000000  00000000  00132fc6  2**0
                   CONTENTS, READONLY
  20 .debug_frame  000043c4  00000000  00000000  0013300c  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
@@ -517,8 +517,8 @@ void DTCProcessFault(void){
  8000660:	200000bc 	.word	0x200000bc
 
 08000664 <EEPROM_WriteEnable>:
-#include "EEPROM.h"
 
+//SPI 버스 사용 중인지 확인하기 위한 플래그
 volatile uint8_t is_spi_busy = 0;
 
 //EEPROM에 Write를 하기 위해서는 WREN을 먼저 보내야함.
@@ -635,11 +635,11 @@ void EEPROM_WriteDTC(void) {
  8000718:	20000000 	.word	0x20000000
 
 0800071c <Process_CAN_Response>:
-CANData_t data;
 
 // 인터럽트 완료 확인을 위한 플래그 변수
 volatile uint8_t can_rx_flag = 0;
 
+// UDS 요청을 처리하기 위한 함수
 void Process_CAN_Response(CANData_t data) {
  800071c:	b5b0      	push	{r4, r5, r7, lr}
  800071e:	b08e      	sub	sp, #56	@ 0x38
@@ -672,7 +672,7 @@ void Process_CAN_Response(CANData_t data) {
  8000744:	2304      	movs	r3, #4
  8000746:	62fb      	str	r3, [r7, #44]	@ 0x2c
 
-  // UDS 0x19: Read DTCs
+  // UDS 0x19 DTC 읽기 요청 처리
 	if (data.read_request.sid == 0x19) {
  8000748:	787b      	ldrb	r3, [r7, #1]
  800074a:	2b19      	cmp	r3, #25
@@ -683,7 +683,7 @@ void Process_CAN_Response(CANData_t data) {
  8000754:	f040 80ca 	bne.w	80008ec <Process_CAN_Response+0x1d0>
 			return;
 		}
-
+        // 고장이 있는 항목만 송신 버퍼에 추가
 		if(data.read_request.sub_func == 0x02){
  8000758:	78bb      	ldrb	r3, [r7, #2]
  800075a:	2b02      	cmp	r3, #2
@@ -825,10 +825,10 @@ void Process_CAN_Response(CANData_t data) {
  8000852:	2201      	movs	r2, #1
  8000854:	701a      	strb	r2, [r3, #0]
  8000856:	e01f      	b.n	8000898 <Process_CAN_Response+0x17c>
-			else{
                 /* for misra code*/
 			}
 		}
+		// 지원하지 않는 sub function 요청 응답
 		else{
 			TxData[1] = 0x7F;
  8000858:	237f      	movs	r3, #127	@ 0x7f
@@ -842,7 +842,7 @@ void Process_CAN_Response(CANData_t data) {
  8000864:	e018      	b.n	8000898 <Process_CAN_Response+0x17c>
 		}
 	}
-	// UDS 0x14: Clear DTCs
+	// UDS 0X14 DTC 초기화 요청 처리
 	else if (data.read_request.sid == 0x14) {
  8000866:	787b      	ldrb	r3, [r7, #1]
  8000868:	2b14      	cmp	r3, #20
@@ -871,13 +871,13 @@ void Process_CAN_Response(CANData_t data) {
 		}
 		EEPROM_WriteDTC();
  8000890:	f7ff ff06 	bl	80006a0 <EEPROM_WriteDTC>
-		TxData[1] = 0x54; // 응답
+		TxData[1] = 0x54;
  8000894:	2354      	movs	r3, #84	@ 0x54
  8000896:	727b      	strb	r3, [r7, #9]
-// 	}
-// 	EEPROM_WriteDTC();
-//     TxData[1] = 0x44;// 응답
+		/* for misra code*/
+	}
 
+	// 블랙박스 테스트에서 확인하기 위한 변수로 송신 버퍼의 내용을 복사
 #ifdef TEST_CASE
 	bb_tx_header = TxHeader;
  8000898:	4b17      	ldr	r3, [pc, #92]	@ (80008f8 <Process_CAN_Response+0x1dc>)
@@ -891,7 +891,7 @@ void Process_CAN_Response(CANData_t data) {
  80008ac:	2300      	movs	r3, #0
  80008ae:	633b      	str	r3, [r7, #48]	@ 0x30
  80008b0:	e00c      	b.n	80008cc <Process_CAN_Response+0x1b0>
-	bb_tx_data[i] = TxData[i];
+		bb_tx_data[i] = TxData[i];
  80008b2:	f107 0208 	add.w	r2, r7, #8
  80008b6:	6b3b      	ldr	r3, [r7, #48]	@ 0x30
  80008b8:	4413      	add	r3, r2
@@ -914,7 +914,7 @@ void Process_CAN_Response(CANData_t data) {
  80008d4:	2201      	movs	r2, #1
  80008d6:	701a      	strb	r2, [r3, #0]
 #endif
-
+	// CAN 송신
   	HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
  80008d8:	f107 0310 	add.w	r3, r7, #16
  80008dc:	f107 0208 	add.w	r2, r7, #8
@@ -1040,7 +1040,7 @@ TestResult WB_TC01_FaultBitDecode(void)
  80009c0:	4b1a      	ldr	r3, [pc, #104]	@ (8000a2c <WB_TC01_FaultBitDecode+0x78>)
  80009c2:	2210      	movs	r2, #16
  80009c4:	701a      	strb	r2, [r3, #0]
-    //의도한대로 버퍼에 레지스터값이 저장되면 1, 그렇지 않으면 0
+    //의도한대로 버퍼에 레지스터값이 저장되면 check_ 변수에 1, 그렇지 않으면 0
     uint8_t check_uv;
     uint8_t check_ov;
     uint8_t check_oc;
@@ -1234,6 +1234,7 @@ TestResult WB_TC02_FaultToDTC(void)
 
 08000afc <BB_ResetFaults>:
 
+//PMIC 레지스터 버퍼, DTC 버퍼를 초기화하는 함수
 static void BB_ResetFaults(void)
 {
  8000afc:	b480      	push	{r7}
@@ -1286,17 +1287,19 @@ static void BB_ResetFaults(void)
 
 08000b54 <BB_TC01_ReadDtcResponse>:
 
-/* OV 고장 후 ReadDTC(0x19 02 01) 응답이 규격 프레임인지 */
+// 고장 정보에 대한 응답이 규격 프레임인지 확인하는 함수
 TestResult BB_TC01_ReadDtcResponse(void)
 {
  8000b54:	b580      	push	{r7, lr}
  8000b56:	b084      	sub	sp, #16
  8000b58:	af00      	add	r7, sp, #0
+    // 가상의 요청 데이터 프레임 버퍼 req
     CANData_t req = {0};
  8000b5a:	f107 0308 	add.w	r3, r7, #8
  8000b5e:	2200      	movs	r2, #0
  8000b60:	601a      	str	r2, [r3, #0]
  8000b62:	605a      	str	r2, [r3, #4]
+    // 기대하는 정답 프레임
     const uint8_t expect[] = {0x59, 0x02, 0x01, 0x34, 0x56, 0x01};
  8000b64:	4a14      	ldr	r2, [pc, #80]	@ (8000bb8 <BB_TC01_ReadDtcResponse+0x64>)
  8000b66:	463b      	mov	r3, r7
@@ -1305,15 +1308,19 @@ TestResult BB_TC01_ReadDtcResponse(void)
  8000b6e:	3304      	adds	r3, #4
  8000b70:	8019      	strh	r1, [r3, #0]
 
+    // 고장 상태 초기화
     BB_ResetFaults();
  8000b72:	f7ff ffc3 	bl	8000afc <BB_ResetFaults>
-    voltage_reg_buff.raw = 0x10; /* 상위 니블 OV */
+    // 임의로 전압 고장 상태 설정
+    voltage_reg_buff.raw = 0x10;
  8000b76:	4b11      	ldr	r3, [pc, #68]	@ (8000bbc <BB_TC01_ReadDtcResponse+0x68>)
  8000b78:	2210      	movs	r2, #16
  8000b7a:	701a      	strb	r2, [r3, #0]
+    // 전압 고장 상태를 DTC로 변환
     DTCProcessFault();
  8000b7c:	f7ff fd3e 	bl	80005fc <DTCProcessFault>
 
+    // 임의로 UDS 요청 프레임 설정
     req.read_request.sid = 0x19;
  8000b80:	2319      	movs	r3, #25
  8000b82:	727b      	strb	r3, [r7, #9]
@@ -1323,11 +1330,13 @@ TestResult BB_TC01_ReadDtcResponse(void)
     req.read_request.status_mask = 0x01;
  8000b88:	2301      	movs	r3, #1
  8000b8a:	72fb      	strb	r3, [r7, #11]
+    // UDS 요청 프레임 처리
     Process_CAN_Response(req);
  8000b8c:	f107 0308 	add.w	r3, r7, #8
  8000b90:	e893 0003 	ldmia.w	r3, {r0, r1}
  8000b94:	f7ff fdc2 	bl	800071c <Process_CAN_Response>
 
+    // 응답 프레임을 정답 프레임과 비교
     if (memcmp(&bb_tx_data[1], expect, sizeof(expect)) != 0) {
  8000b98:	463b      	mov	r3, r7
  8000b9a:	2206      	movs	r2, #6
@@ -1354,17 +1363,19 @@ TestResult BB_TC01_ReadDtcResponse(void)
 
 08000bc4 <BB_TC02_UnsupportedSubFunction>:
 
-/* 지원하지 않는 sub-function이면 NRC 0x12 */
+// 지원하지 않는 sub-function 요청에 대한 응답이 규격 프레임인지 확인하는 함수
 TestResult BB_TC02_UnsupportedSubFunction(void)
 {
  8000bc4:	b580      	push	{r7, lr}
  8000bc6:	b084      	sub	sp, #16
  8000bc8:	af00      	add	r7, sp, #0
+    // 가상의 요청 데이터 프레임 버퍼 req
     CANData_t req = {0};
  8000bca:	f107 0308 	add.w	r3, r7, #8
  8000bce:	2200      	movs	r2, #0
  8000bd0:	601a      	str	r2, [r3, #0]
  8000bd2:	605a      	str	r2, [r3, #4]
+    // 기대하는 정답 프레임
     const uint8_t expect[] = {0x7F, 0x19, 0x12};
  8000bd4:	4a12      	ldr	r2, [pc, #72]	@ (8000c20 <BB_TC02_UnsupportedSubFunction+0x5c>)
  8000bd6:	1d3b      	adds	r3, r7, #4
@@ -1375,8 +1386,10 @@ TestResult BB_TC02_UnsupportedSubFunction(void)
  8000be0:	0c12      	lsrs	r2, r2, #16
  8000be2:	701a      	strb	r2, [r3, #0]
 
+    // 고장 상태 초기화
     BB_ResetFaults();
  8000be4:	f7ff ff8a 	bl	8000afc <BB_ResetFaults>
+    // 임의로 지원하지 않는 sub-function 요청 프레임 설정
     req.read_request.sid = 0x19;
  8000be8:	2319      	movs	r3, #25
  8000bea:	727b      	strb	r3, [r7, #9]
@@ -1386,11 +1399,13 @@ TestResult BB_TC02_UnsupportedSubFunction(void)
     req.read_request.status_mask = 0x01;
  8000bf0:	2301      	movs	r3, #1
  8000bf2:	72fb      	strb	r3, [r7, #11]
+    // UDS 요청 프레임 처리
     Process_CAN_Response(req);
  8000bf4:	f107 0308 	add.w	r3, r7, #8
  8000bf8:	e893 0003 	ldmia.w	r3, {r0, r1}
  8000bfc:	f7ff fd8e 	bl	800071c <Process_CAN_Response>
 
+    // 응답 프레임을 정답 프레임과 비교
     if (memcmp(&bb_tx_data[1], expect, sizeof(expect)) != 0) {
  8000c00:	1d3b      	adds	r3, r7, #4
  8000c02:	2203      	movs	r2, #3

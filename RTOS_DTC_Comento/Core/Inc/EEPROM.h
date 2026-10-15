@@ -7,6 +7,7 @@
 #define EEPROM_CMD_READ  0x03
 #define EEPROM_DTC_ADDR  0x0000
 
+//SPI 버스 사용 중인지 확인하기 위한 플래그
 extern volatile uint8_t is_spi_busy;
 
 // EEPROM에 Write를 하기 위해서 WREN을 해야 함

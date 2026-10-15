@@ -33,7 +33,7 @@ TestResult WB_TC01_FaultBitDecode(void)
     voltage_reg_buff.raw = 0x01;
     current_reg_buff.raw = 0x10;
 
-    //의도한대로 버퍼에 레지스터값이 저장되면 1, 그렇지 않으면 0
+    //의도한대로 버퍼에 레지스터값이 저장되면 check_ 변수에 1, 그렇지 않으면 0
     uint8_t check_uv;
     uint8_t check_ov;
     uint8_t check_oc;
@@ -82,6 +82,7 @@ TestResult WB_TC02_FaultToDTC(void)
     return TEST_PASS;
 }
 
+//PMIC 레지스터 버퍼, DTC 버퍼를 초기화하는 함수
 static void BB_ResetFaults(void)
 {
     voltage_reg_buff.raw = 0;
@@ -92,39 +93,53 @@ static void BB_ResetFaults(void)
     bb_tx_seen = 0;
 }
 
-/* OV 고장 후 ReadDTC(0x19 02 01) 응답이 규격 프레임인지 */
+// 고장 정보에 대한 응답이 규격 프레임인지 확인하는 함수
 TestResult BB_TC01_ReadDtcResponse(void)
 {
+    // 가상의 요청 데이터 프레임 버퍼 req
     CANData_t req = {0};
+    // 기대하는 정답 프레임
     const uint8_t expect[] = {0x59, 0x02, 0x01, 0x34, 0x56, 0x01};
 
+    // 고장 상태 초기화
     BB_ResetFaults();
-    voltage_reg_buff.raw = 0x10; /* 상위 니블 OV */
+    // 임의로 전압 고장 상태 설정
+    voltage_reg_buff.raw = 0x10;
+    // 전압 고장 상태를 DTC로 변환
     DTCProcessFault();
 
+    // 임의로 UDS 요청 프레임 설정
     req.read_request.sid = 0x19;
     req.read_request.sub_func = 0x02;
     req.read_request.status_mask = 0x01;
+    // UDS 요청 프레임 처리
     Process_CAN_Response(req);
 
+    // 응답 프레임을 정답 프레임과 비교
     if (memcmp(&bb_tx_data[1], expect, sizeof(expect)) != 0) {
         return TEST_FAIL;
     }
     return TEST_PASS;
 }
 
-/* 지원하지 않는 sub-function이면 NRC 0x12 */
+// 지원하지 않는 sub-function 요청에 대한 응답이 규격 프레임인지 확인하는 함수
 TestResult BB_TC02_UnsupportedSubFunction(void)
 {
+    // 가상의 요청 데이터 프레임 버퍼 req
     CANData_t req = {0};
+    // 기대하는 정답 프레임
     const uint8_t expect[] = {0x7F, 0x19, 0x12};
 
+    // 고장 상태 초기화
     BB_ResetFaults();
+    // 임의로 지원하지 않는 sub-function 요청 프레임 설정
     req.read_request.sid = 0x19;
     req.read_request.sub_func = 0xFF;
     req.read_request.status_mask = 0x01;
+    // UDS 요청 프레임 처리
     Process_CAN_Response(req);
 
+    // 응답 프레임을 정답 프레임과 비교
     if (memcmp(&bb_tx_data[1], expect, sizeof(expect)) != 0) {
         return TEST_FAIL;
     }

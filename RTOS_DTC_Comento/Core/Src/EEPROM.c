@@ -2,6 +2,7 @@
 #include "DTC.h"
 #include "EEPROM.h"
 
+//SPI 버스 사용 중인지 확인하기 위한 플래그
 volatile uint8_t is_spi_busy = 0;
 
 //EEPROM에 Write를 하기 위해서는 WREN을 먼저 보내야함.
