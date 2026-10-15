@@ -95,7 +95,7 @@ osMutexId_t CommMutexHandle;
 const osMutexAttr_t CommMutex_attributes = {
   .name = "CommMutex"
 };
-
+// spi, i2c 세마포어
 osSemaphoreId_t spiDoneHandle;
 osSemaphoreId_t i2cDoneHandle;
 const osSemaphoreAttr_t spiDone_attributes = { .name = "spiDone" };
@@ -196,13 +196,14 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
+  //뮤텍스 생성
   CommMutexHandle = osMutexNew(&CommMutex_attributes);
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
 
-
+  // spi, i2c 세마포어 생성
   spiDoneHandle = osSemaphoreNew(1, 0, &spiDone_attributes);
   i2cDoneHandle = osSemaphoreNew(1, 0, &i2cDone_attributes);
   /* USER CODE END RTOS_SEMAPHORES */
@@ -669,21 +670,21 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-//I2C 수신 콜백(is_i2c_busy 플래그 0 초기화)
+//I2C 수신 콜백(i2cDoneHandle 세마포어 해제)
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
   if (hi2c->Instance == I2C1) {
     osSemaphoreRelease(i2cDoneHandle);
   }
 }
-//I2C 송신 콜백(is_i2c_busy 플래그 0 초기화)
+//SPI 송신 콜백(spiDoneHandle 세마포어 해제)
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   if (hspi->Instance == SPI1) {
     osSemaphoreRelease(spiDoneHandle);
   }
 }
-//I2C 수신 콜백(is_i2c_busy 플래그 0 초기화)
+//SPI 수신 콜백(spiDoneHandle 세마포어 해제)
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   if (hspi->Instance == SPI1) {
@@ -717,17 +718,21 @@ void StartTask_1ms(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
-	if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(1)) == osOK)
-	{
-	  PMIC_Read_Fault();
-	  DTCProcessFault();
-	  if (can_rx_flag) {
-		can_rx_flag = 0;
-		Process_CAN_Response(data);
-	  }
-	  osMutexRelease(CommMutexHandle);
-	}
+    // 1ms 주기 태스크
+    vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
+    // CommMutexHandle 세마포어 획득
+    if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(1)) == osOK)
+    {
+      // PMIC 레지스터 버퍼로부터 DTC로 변환
+      PMIC_Read_Fault();
+      DTCProcessFault();
+      // CAN 인터럽트가 있다면 UDS 프로토콜을 통해 데이터 처리
+      if (can_rx_flag) {
+        can_rx_flag = 0;
+        Process_CAN_Response(data);
+      }
+      osMutexRelease(CommMutexHandle);
+    }
   }
   /* USER CODE END 5 */
 }
@@ -743,51 +748,58 @@ void StartTask_5ms(void *argument)
 {
   /* USER CODE BEGIN StartTask_5ms */
   TickType_t xLastWakeTime = xTaskGetTickCount();
+  // 정상/오류 메시지 버퍼
   const char msg1[] = "ECU System Running\r\n";
   const char msg2[] = "ECU System Went Wrong\r\n";
   /* Infinite loop */
   for(;;)
   {
-	vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(5));
-
-	if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(5)) == osOK)
-	{
-	  HAL_ADC_Start(&hadc1);
-    //PMIC UVLO 검사
-	  if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
-		  uint16_t pmic_adc_val = HAL_ADC_GetValue(&hadc1);
-		  if ((pmic_adc_val < PMIC_CH1_UVLO_ADC) || (pmic_adc_val > PMIC_CH1_OV_ADC)) {
-			  if (dtclst[BRAKE_UVLOinDTC].active == 0) {
-				  dtclst[BRAKE_UVLOinDTC].active = 1;
-				  EEPROM_WriteDTC();
-			  }
-		  }
-	  }
-    //BTS7008 FAULT 검사
-    if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
-		  uint16_t bts_adc_val = HAL_ADC_GetValue(&hadc1);
-		  if (BTS7008_CheckFault(bts_adc_val) == BTS7008_DIAG_FAULT) {
-			  if (dtclst[BTS7008_FAULTinDTC].active == 0) {
-				  dtclst[BTS7008_FAULTinDTC].active = 1;
-				  EEPROM_WriteDTC();
-			  }
-        BTS7008_SetOutput(0);
-		  }
-	  }
-	  HAL_ADC_Stop(&hadc1);
-	  int err_count = 0;
-	  for (int i = 0; i < MAX_DTC_NUM; i++) {
-      if (dtclst[i].active == 1) {
-        HAL_UART_Transmit(&huart4, (uint8_t *)msg2, strlen(msg2), HAL_MAX_DELAY);
-        err_count++;
+    // 5ms 주기 태스크
+    vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(5));
+    // CommMutexHandle 세마포어 획득
+    if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(5)) == osOK)
+    {
+      // ADC 시작
+      HAL_ADC_Start(&hadc1);
+      //PMIC UVLO 검사
+      if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
+        uint16_t pmic_adc_val = HAL_ADC_GetValue(&hadc1);
+        if ((pmic_adc_val < PMIC_CH1_UVLO_ADC) || (pmic_adc_val > PMIC_CH1_OV_ADC)) {
+          if (dtclst[BRAKE_UVLOinDTC].active == 0) {
+            dtclst[BRAKE_UVLOinDTC].active = 1;
+            EEPROM_WriteDTC();
+          }
+        }
       }
-	  }
-	  if (err_count == 0) {
-		HAL_UART_Transmit(&huart4, (uint8_t *)msg1, strlen(msg1), HAL_MAX_DELAY);
-	  }
-
-	  osMutexRelease(CommMutexHandle);
-	}
+      //BTS7008 FAULT 검사
+      if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
+        uint16_t bts_adc_val = HAL_ADC_GetValue(&hadc1);
+        if (BTS7008_CheckFault(bts_adc_val) == BTS7008_DIAG_FAULT) {
+          if (dtclst[BTS7008_FAULTinDTC].active == 0) {
+            dtclst[BTS7008_FAULTinDTC].active = 1;
+            EEPROM_WriteDTC();
+          }
+          BTS7008_SetOutput(0);
+        }
+      }
+      // ADC 중지
+      HAL_ADC_Stop(&hadc1);
+      // 고장 개수 카운트
+      int err_count = 0;
+      // 고장 개수만큼 에러 메시지 출력
+      for (int i = 0; i < MAX_DTC_NUM; i++) {
+        if (dtclst[i].active == 1) {
+          HAL_UART_Transmit(&huart4, (uint8_t *)msg2, strlen(msg2), HAL_MAX_DELAY);
+          err_count++;
+        }
+      }
+      // 고장이 없으면 정상 메시지 출력
+      if (err_count == 0) {
+        HAL_UART_Transmit(&huart4, (uint8_t *)msg1, strlen(msg1), HAL_MAX_DELAY);
+      }
+      // CommMutexHandle 세마포어 해제
+      osMutexRelease(CommMutexHandle);
+    }
   }
   /* USER CODE END StartTask_5ms */
 }

@@ -4,7 +4,7 @@
 #include "EEPROM.h"
 #include "TestCase.h"
 
-// 위 구조체들의 배열
+// DTC_t 구조체들의 배열
 DTC_t dtclst[MAX_DTC_NUM] = {
 		{UV, 0},
 		{OV, 0},
@@ -35,11 +35,6 @@ void DTCProcessFault(void){
 			  dtclst[OCinDTC].active = 1;
 		  }
 		}
-//		if (temperature_reg_buff.bit.high_temp) {
-//		  if (dtclst[HIGH_TEMPinDTC].active == 0) {
-//			  dtclst[HIGH_TEMPinDTC].active = 1;
-//		  }
-//		}
 #if TEST_CASE
 #else
 		//고장이 났을 경우에만 EEPROM에 고장 정보 WRITE

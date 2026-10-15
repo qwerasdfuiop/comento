@@ -38,7 +38,7 @@ extern SPI_HandleTypeDef hspi1;
 extern CAN_HandleTypeDef hcan1;
 extern UART_HandleTypeDef huart4;
 extern ADC_HandleTypeDef hadc1;
-
+//EEPROM, PMIC 세마포어
 extern osSemaphoreId_t spiDoneHandle;
 extern osSemaphoreId_t i2cDoneHandle;
 /* USER CODE END Includes */
