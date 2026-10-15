@@ -601,7 +601,13 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
     is_i2c_busy = 0;
   }
 }
-
+//I2C 송신 콜백(is_i2c_busy 플래그 0 초기화)
+void HAL_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+  if (hi2c->Instance == I2C1) {
+    is_i2c_busy = 0;
+  }
+}
 //SPI 송신 콜백(is_spi_busy 플래그 0 초기화)
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
