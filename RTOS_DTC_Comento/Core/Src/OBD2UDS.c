@@ -10,11 +10,13 @@ CAN_TxHeaderTypeDef bb_tx_header;
 uint8_t bb_tx_seen;
 #endif
 
+// UDS 데이터 처리를 위한 CANDATA_t 인스턴스
 CANData_t data;
 
 // 인터럽트 완료 확인을 위한 플래그 변수
 volatile uint8_t can_rx_flag = 0;
 
+// UDS 요청을 처리하기 위한 함수
 void Process_CAN_Response(CANData_t data) {
 
   CAN_TxHeaderTypeDef TxHeader;
@@ -28,12 +30,12 @@ void Process_CAN_Response(CANData_t data) {
 
   int index = 4;
 
-  // UDS 0x19: Read DTCs
+  // UDS 0x19 DTC 읽기 요청 처리
 	if (data.read_request.sid == 0x19) {
 		if(data.read_request.status_mask != 0x01){
 			return;
 		}
-
+        // 고장이 있는 항목만 송신 버퍼에 추가
 		if(data.read_request.sub_func == 0x02){
 			TxData[1] = 0x59;
 			TxData[2] = 0x02;
@@ -62,13 +64,14 @@ void Process_CAN_Response(CANData_t data) {
                 /* for misra code*/
 			}
 		}
+		// 지원하지 않는 sub function 요청 응답
 		else{
 			TxData[1] = 0x7F;
 			TxData[2] = 0x19;
 			TxData[3] = 0x12;
 		}
 	}
-	// UDS 0x14: Clear DTCs
+	// UDS 0X14 DTC 초기화 요청 처리
 	else if (data.read_request.sid == 0x14) {
 		for(int i = 0; i < MAX_DTC_NUM; i++){
 			dtclst[i].active = 0;
@@ -81,37 +84,6 @@ void Process_CAN_Response(CANData_t data) {
 		/* for misra code*/
 	}
 
-	//   // OBD2 0x03: Read DTCs
-//   if (data.field.sid == 0x03) {
-
-// 	  TxData[1] = 0x43;
-// 	  if(dtclst[UVinDTC].active == 1){
-// 		  TxData[index] = (dtclst[UVinDTC].DTC_Code >> 8) & 0xFF;
-// 		  index++;
-// 		  TxData[index] = dtclst[UVinDTC].DTC_Code & 0xFF;
-// 		  index++;
-// 	  }
-// 	  if(dtclst[OVinDTC].active == 1){
-// 		  TxData[index] = (dtclst[OVinDTC].DTC_Code >> 8) & 0xFF;
-// 		  index++;
-// 		  TxData[index] = dtclst[OVinDTC].DTC_Code & 0xFF;
-// 		  index++;
-// 	  }
-// 	  if(dtclst[OCinDTC].active == 1){
-// 		  TxData[index] = (dtclst[OCinDTC].DTC_Code >> 8) & 0xFF;
-// 		  index++;
-// 		  TxData[index] = dtclst[OCinDTC].DTC_Code & 0xFF;
-// 		  index++;
-// 	  }
-//   }
-//   // OBD2 0x04: Clear DTCs
-//   else if (data.field.sid == 0x04) {
-// 	for(int i = 0; i < MAX_DTC_NUM; i++){
-// 		dtclst[i].active = 0;
-// 	}
-// 	EEPROM_WriteDTC();
-//     TxData[1] = 0x44;// 응답
-
 #ifdef TEST_CASE
 	bb_tx_header = TxHeader;
 	for (int i = 0; i < 8; i++) {
@@ -119,6 +91,6 @@ void Process_CAN_Response(CANData_t data) {
 	}
 	bb_tx_seen = 1;
 #endif
-
+	// CAN 송신
   	HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
 }

@@ -646,21 +646,21 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-//I2C 수신 콜백(is_i2c_busy 플래그 0 초기화)
+//I2C 수신 콜백(i2cDoneHandle 세마포어 해제)
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
   if (hi2c->Instance == I2C1) {
     osSemaphoreRelease(i2cDoneHandle);
   }
 }
-//I2C 송신 콜백(is_i2c_busy 플래그 0 초기화)
+//I2C 송신 콜백(i2cDoneHandle 세마포어 해제)
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   if (hspi->Instance == SPI1) {
     osSemaphoreRelease(spiDoneHandle);
   }
 }
-//I2C 수신 콜백(is_i2c_busy 플래그 0 초기화)
+//SPI 수신 콜백(spiDoneHandle 세마포어 해제)
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   if (hspi->Instance == SPI1) {
@@ -681,15 +681,20 @@ void StartTask_1ms(void *argument)
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;)
   {
+    // 1ms 주기 태스크
     vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
+    // CommMutexHandle 세마포어 획득
     if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(1)) == osOK)
     {
+      // PMIC 레지스터 버퍼로부터 DTC로 변환
       PMIC_Read_Fault();
       DTCProcessFault();
+      // CAN 인터럽트가 있다면 UDS 프로토콜을 통해 데이터 처리
       if (can_rx_flag) {
         can_rx_flag = 0;
         Process_CAN_Response(data);
       }
+      // CommMutexHandle 세마포어 해제
       osMutexRelease(CommMutexHandle);
     }
   }
@@ -697,18 +702,23 @@ void StartTask_1ms(void *argument)
 void StartTask_5ms(void *argument)
 {
   TickType_t xLastWakeTime = xTaskGetTickCount();
+  // 정상/오류 메시지 버퍼
   const char msg1[] = "ECU System Running\r\n";
   const char msg2[] = "ECU System Went Wrong\r\n";
 
   for (;;)
   {
+    // 5ms 주기 태스크
     vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(5));
-
+    // CommMutexHandle 세마포어 획득
     if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(5)) == osOK)
     {
+      // ADC 시작
       HAL_ADC_Start(&hadc1);
+      // PMIC 레지스터 버퍼로부터 DTC로 변환
       if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
           uint16_t adc_val = HAL_ADC_GetValue(&hadc1);
+          // UVLO 혹은 OV 고장이 있다면 EEPROM에 DTC를 WRITE
           if ((adc_val < PMIC_CH1_UVLO_ADC) || (adc_val > PMIC_CH1_OV_ADC)) {
               if (dtclst[BRAKE_UVLOinDTC].active == 0) {
                   dtclst[BRAKE_UVLOinDTC].active = 1;
@@ -716,18 +726,22 @@ void StartTask_5ms(void *argument)
               }
           }
       }
+      // ADC 중지
       HAL_ADC_Stop(&hadc1);
+      // 고장 개수 카운트
       int err_count = 0;
+      // 고장 개수만큼 에러 메시지 출력
       for (int i = 0; i < MAX_DTC_NUM; i++) {
         if (dtclst[i].active == 1) {
           HAL_UART_Transmit(&huart4, (uint8_t *)msg2, strlen(msg2), HAL_MAX_DELAY);
           err_count++;
         }
       }
+      // 고장이 없으면 정상 메시지 출력
       if (err_count == 0) {
         HAL_UART_Transmit(&huart4, (uint8_t *)msg1, strlen(msg1), HAL_MAX_DELAY);
       }
-
+      // CommMutexHandle 세마포어 해제
       osMutexRelease(CommMutexHandle);
     }
   }

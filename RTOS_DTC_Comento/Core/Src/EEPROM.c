@@ -2,8 +2,6 @@
 #include "DTC.h"
 #include "EEPROM.h"
 
-volatile uint8_t is_spi_busy = 0;
-
 //EEPROM에 Write를 하기 위해서는 WREN을 먼저 보내야함.
 void EEPROM_WriteEnable(void) {
   //WREN 명령
@@ -27,11 +25,9 @@ void EEPROM_WriteDTC(void) {
   // PMIC Slave 선택
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
   // 명령 전송
-  is_spi_busy = 1;
   HAL_SPI_Transmit_DMA(&hspi1, cmd, 3);
   osSemaphoreAcquire(spiDoneHandle, 100);
   // DTC 정보 전송
-  is_spi_busy = 1;
   HAL_SPI_Transmit_DMA(&hspi1, (uint8_t*)&dtclst, sizeof(dtclst));
   osSemaphoreAcquire(spiDoneHandle, 100);
   // PMIC Slave 통신 종료
@@ -48,11 +44,9 @@ void EEPROM_ReadDTC(void) {
   // PMIC Slave 선택
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
   // 명령 전송
-  is_spi_busy = 1;
   HAL_SPI_Transmit_DMA(&hspi1, cmd, 3);
   osSemaphoreAcquire(spiDoneHandle, 100);
   // DTC 정보 읽기
-  is_spi_busy = 1;
   HAL_SPI_Receive_DMA(&hspi1, (uint8_t*)&dtclst, sizeof(dtclst));
   osSemaphoreAcquire(spiDoneHandle, 100);
   // PMIC Slave 통신 종료

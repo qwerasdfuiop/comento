@@ -1,10 +1,10 @@
 #ifndef OBD2UDS_H_
 #define OBD2UDS_H_
 
-// OBD, UDS 형태의 데이터 프레임 버퍼
+// UDS 형태의 데이터 프레임 버퍼
 
 typedef union {
-  uint8_t raw[8];          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
+  uint8_t raw[8];        
   struct {
     uint8_t iso_tp;
     uint8_t sid;
@@ -17,6 +17,7 @@ typedef union {
   } read_request;
 } CANData_t;
 
+// UDS 데이터 처리를 위한 CANDATA_t 인스턴스
 extern CANData_t data;
 
 // 인터럽트 완료 확인을 위한 플래그 변수

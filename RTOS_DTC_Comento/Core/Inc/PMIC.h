@@ -5,7 +5,8 @@
 #define PMIC_I2C_ADDR  (0x60 << 1)
 #define PMIC_V_REFA_HIGH  0x13
 #define PMIC_V_REFA_LOW  0x14
-#define V_REF_SET 0xFF // 임의의 값 설정
+// VREF값 설정
+#define V_REF_SET 0xFF 
 
 // fault 레지스터들의 메모리 주소를 열거형으로
 enum PMICRegisters_t {
@@ -16,7 +17,7 @@ enum PMICRegisters_t {
 
 // UV, OV를 확인할 수 있는 레지스터 버퍼
 typedef union {
-  uint8_t raw;          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
+  uint8_t raw;          
   struct {
     uint8_t buckx_uv	:4;
     uint8_t buckx_ov	:4;
@@ -27,28 +28,17 @@ typedef union {
 
 // OC를 확인할 수 있는 레지스터 버퍼
 typedef union {
-  uint8_t raw;          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
+  uint8_t raw;          
   struct {
     uint8_t buckx_oc;
   } bit;
 } current_fault_reg;
-
+// UV, OV 고장 정보 레지스터로부터 읽은 값을 저장하는 변수
 extern voltage_fault_reg voltage_reg_buff;
-
+// OC 고장 정보 레지스터로부터 읽은 값을 저장하는 변수
 extern current_fault_reg current_reg_buff;
-
+// 임의로 V_REF 단계 설정 가능.
 extern uint16_t v_ref_set;
-
-extern volatile uint8_t is_i2c_busy;
-
-// HIGH_TEMP를 확인할 수 있는 레지스터 버퍼
-//typedef union {
-//  uint8_t raw;          /* HAL_CAN_GetRxMessage / AddTxMessage용 */
-//  struct {
-//    uint8_t reserved	:6;
-//    uint8_t high_temp	:2;
-//  } bit;
-//} temperature_fault_reg;
 
 // PMIC의 VREF 값 변경
 void PMIC_Vref_Change(uint16_t v_ref_set);

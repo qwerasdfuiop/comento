@@ -14,7 +14,7 @@
 ../Core/Src/main.c:664:6:HAL_SPI_RxCpltCallback	2
 ../Core/Src/main.c:671:6:HAL_CAN_RxFifo0MsgPendingCallback	2
 ../Core/Src/main.c:679:6:StartTask_1ms	3
-../Core/Src/main.c:697:6:StartTask_5ms	9
-../Core/Src/main.c:745:6:StartDefaultTask	5
-../Core/Src/main.c:789:6:HAL_TIM_PeriodElapsedCallback	2
-../Core/Src/main.c:807:6:Error_Handler	1
+../Core/Src/main.c:702:6:StartTask_5ms	9
+../Core/Src/main.c:759:6:StartDefaultTask	5
+../Core/Src/main.c:803:6:HAL_TIM_PeriodElapsedCallback	2
+../Core/Src/main.c:821:6:Error_Handler	1
