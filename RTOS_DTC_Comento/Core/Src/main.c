@@ -137,8 +137,9 @@ int main(void)
   MX_UART4_Init();
   /* USER CODE BEGIN 2 */
 
-  //CAN 인터럽트 시작
+  //CAN 시작
   HAL_CAN_Start(&hcan1);
+  //CAN 인터럽트 시작
   HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 
 #ifdef TEST_CASE
@@ -160,16 +161,16 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
-	//I2C DMA INTERRUPT 방식으로 UV 혹은 OV 혹은 OC 여부 READ
-	PMIC_Read_Fault();
+    //I2C DMA INTERRUPT 방식으로 UV 혹은 OV 혹은 OC 여부 READ
+    PMIC_Read_Fault();
 
     //만일 UV 혹은 OV 가 있다면 EEPROM에 DTC를 WRITE
-	DTCProcessFault();
+    DTCProcessFault();
 
     // CAN INTERRUPT 방식으로 UDS / OBD 메시지 송수신
     if (can_rx_flag) {
-	  can_rx_flag = 0;
-	  Process_CAN_Response(data);
+      can_rx_flag = 0;
+      Process_CAN_Response(data);
     }
 
     // uart 폴링 방식으로 메시지 출력. 고장이 있으면 고장 개수만큼 에러 메시지 출력. 고장이 없으면 정상 메시지 출력
@@ -600,7 +601,8 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
     is_i2c_busy = 0;
   }
 }
-//I2C 송신 콜백(is_i2c_busy 플래그 0 초기화)
+
+//SPI 송신 콜백(is_spi_busy 플래그 0 초기화)
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   if (hspi->Instance == SPI1) {

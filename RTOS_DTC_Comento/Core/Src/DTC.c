@@ -34,11 +34,6 @@ void DTCProcessFault(void){
 			  dtclst[OCinDTC].active = 1;
 		  }
 		}
-//		if (temperature_reg_buff.bit.high_temp) {
-//		  if (dtclst[HIGH_TEMPinDTC].active == 0) {
-//			  dtclst[HIGH_TEMPinDTC].active = 1;
-//		  }
-//		}
 #ifdef TEST_CASE
 #else
 		//고장이 났을 경우에만 EEPROM에 고장 정보 WRITE
