@@ -5,7 +5,7 @@
 #include "TestCase.h"
 
 // 테스트 케이스에서 사용하기 위한 변수
-#ifdef TEST_CASE
+#if TEST_CASE
 uint8_t bb_tx_data[8];
 CAN_TxHeaderTypeDef bb_tx_header;
 uint8_t bb_tx_seen;
@@ -87,7 +87,7 @@ void Process_CAN_Response(CANData_t data) {
 	}
 
 	// 블랙박스 테스트에서 확인하기 위한 변수로 송신 버퍼의 내용을 복사
-#ifdef TEST_CASE
+#if TEST_CASE
 	bb_tx_header = TxHeader;
 	for (int i = 0; i < 8; i++) {
 		bb_tx_data[i] = TxData[i];

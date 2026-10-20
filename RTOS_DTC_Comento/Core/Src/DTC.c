@@ -13,7 +13,7 @@ DTC_t dtclst[MAX_DTC_NUM] = {
 
 //PMIC 레지스터 버퍼로부터 DTC로 변환하는 함수
 void DTCProcessFault(void){
-#ifdef TEST_CASE
+#if TEST_CASE
 #else
 	if(voltage_reg_buff.raw || current_reg_buff.raw){
 #endif
@@ -33,7 +33,7 @@ void DTCProcessFault(void){
 			  dtclst[OCinDTC].active = 1;
 		  }
 		}
-#ifdef TEST_CASE
+#if TEST_CASE
 #else
 		//고장이 났을 경우에만 EEPROM에 고장 정보 WRITE
 		EEPROM_WriteDTC();

@@ -447,7 +447,7 @@ Disassembly of section .text:
 void DTCProcessFault(void){
  80005fc:	b480      	push	{r7}
  80005fe:	af00      	add	r7, sp, #0
-#ifdef TEST_CASE
+#if TEST_CASE
 #else
 	if(voltage_reg_buff.raw || current_reg_buff.raw){
 #endif
@@ -878,7 +878,7 @@ void Process_CAN_Response(CANData_t data) {
 	}
 
 	// 블랙박스 테스트에서 확인하기 위한 변수로 송신 버퍼의 내용을 복사
-#ifdef TEST_CASE
+#if TEST_CASE
 	bb_tx_header = TxHeader;
  8000898:	4b17      	ldr	r3, [pc, #92]	@ (80008f8 <Process_CAN_Response+0x1dc>)
  800089a:	461d      	mov	r5, r3
@@ -1487,7 +1487,7 @@ int main(void)
  8000c60:	4803      	ldr	r0, [pc, #12]	@ (8000c70 <main+0x48>)
  8000c62:	f001 ff85 	bl	8002b70 <HAL_CAN_ActivateNotification>
 
-#ifdef TEST_CASE
+#if TEST_CASE
   TestCase_RunAll();
  8000c66:	f7ff fe4f 	bl	8000908 <TestCase_RunAll>
  8000c6a:	2300      	movs	r3, #0

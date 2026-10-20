@@ -18,8 +18,8 @@ enum PMICRegisters_t {
 typedef union {
   uint8_t raw;          
   struct {
-    uint8_t buckx_uv	:4;
     uint8_t buckx_ov	:4;
+    uint8_t buckx_uv	:4;
   } bit;
 } voltage_fault_reg;
 

@@ -24,7 +24,7 @@ extern CANData_t data;
 extern volatile uint8_t can_rx_flag;
 
 // 테스트 케이스에서 사용하기 위한 변수
-#ifdef TEST_CASE
+#if TEST_CASE
 extern uint8_t bb_tx_data[8];
 extern CAN_TxHeaderTypeDef bb_tx_header;
 extern uint8_t bb_tx_seen;

@@ -5,7 +5,7 @@
 #define TEST_CASE 1
 
 // 테스트 케이스 함수 실행 결과 정의
-#ifdef TEST_CASE
+#if TEST_CASE
 typedef enum {
     TEST_PASS = 1,
     TEST_FAIL = 0
