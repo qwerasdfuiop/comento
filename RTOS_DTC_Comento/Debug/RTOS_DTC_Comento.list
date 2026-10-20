@@ -447,7 +447,7 @@ Disassembly of section .text:
 void DTCProcessFault(void){
  80005fc:	b480      	push	{r7}
  80005fe:	af00      	add	r7, sp, #0
-#ifdef TEST_CASE
+#if TEST_CASE
 #else
 	if(voltage_reg_buff.raw || current_reg_buff.raw){
 #endif
@@ -887,7 +887,7 @@ void Process_CAN_Response(CANData_t data) {
 		/* for misra code*/
 	}
 
-#ifdef TEST_CASE
+#if TEST_CASE
 	bb_tx_header = TxHeader;
  80008c0:	4b17      	ldr	r3, [pc, #92]	@ (8000920 <Process_CAN_Response+0x210>)
  80008c2:	461d      	mov	r5, r3
@@ -998,9 +998,9 @@ void PMIC_Read_Fault(void){
  8000988:	200000bc 	.word	0x200000bc
 
 0800098c <TestCase_RunAll>:
-#include <stdio.h>
 #include <string.h>
 
+#if TEST_CASE
 // 모든 테스트 케이스 실행 및 결과 출력
 void TestCase_RunAll(void)
 {
@@ -1534,7 +1534,7 @@ int main(void)
  8000ce4:	4817      	ldr	r0, [pc, #92]	@ (8000d44 <main+0x98>)
  8000ce6:	f002 fa4d 	bl	8003184 <HAL_CAN_ActivateNotification>
 
-#ifdef TEST_CASE
+#if TEST_CASE
   TestCase_RunAll();
  8000cea:	f7ff fe4f 	bl	800098c <TestCase_RunAll>
   /* Init scheduler */

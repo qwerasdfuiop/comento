@@ -1,9 +1,9 @@
 #ifndef TESTCASE_H_
 #define TESTCASE_H_
 
-#define TEST_CASE 0
+#define TEST_CASE 1
 
-#ifdef TEST_CASE
+#if TEST_CASE
 typedef enum {
     TEST_PASS = 1,
     TEST_FAIL = 0

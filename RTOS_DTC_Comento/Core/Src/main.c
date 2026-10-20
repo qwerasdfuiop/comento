@@ -173,7 +173,7 @@ int main(void)
   HAL_CAN_Start(&hcan1);
   HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 
-#ifdef TEST_CASE
+#if TEST_CASE
   TestCase_RunAll();
 #else
   //전원이 꺼지기 전 EEPROM에 저장된 DTC 정보 읽기
