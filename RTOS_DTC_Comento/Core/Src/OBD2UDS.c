@@ -24,46 +24,53 @@ void Process_CAN_Response(CANData_t data) {
   uint32_t TxMailbox;
   uint8_t TxData[8] = {0};
 
-  TxHeader.StdId = 0x7E8; // 응답 ID
   TxHeader.IDE = CAN_ID_STD;
   TxHeader.RTR = CAN_RTR_DATA;
   TxHeader.DLC = 8;
 
-  int index = 4;
+  int index;
 
   // UDS 0x19 DTC 읽기 요청 처리
-	if (data.read_request.sid == 0x19) {
-		if(data.read_request.status_mask != 0x01){
-			return;
-		}
+	if (data.raw[1] == 0x19) {
+		index = 4;
+		TxHeader.StdId = UDS_RESP_ID;
         // 고장이 있는 항목만 송신 버퍼에 추가
-		if(data.read_request.sub_func == 0x02){
+		if(data.read_request.sub_function == 0x02){
 			TxData[1] = 0x59;
 			TxData[2] = 0x02;
-			TxData[3] = 0x01;
-			if(dtclst[UVinDTC].active == 1){
-				TxData[index] = (dtclst[UVinDTC].DTC_Code >> 8) & 0xFF;
+			TxData[3] = DTC_STATUS_AVAIL;
+			if((dtclst[UVinDTC].DTCStatus & DTC_STATUS_AVAIL) != 0x00){
+				TxData[index] = dtclst[UVinDTC].DTC_Code[0];
 				index++;
-				TxData[index] = dtclst[UVinDTC].DTC_Code & 0xFF;
+				TxData[index] = dtclst[UVinDTC].DTC_Code[1];
 				index++;
-				TxData[index] = 0x01;
+				TxData[index] = dtclst[UVinDTC].DTC_Code[2];
+				index++;
+				TxData[index] = dtclst[UVinDTC].DTCStatus;
+				TxData[0] = 0x07;
 			}
-			else if(dtclst[OVinDTC].active == 1){
-				TxData[index] = (dtclst[OVinDTC].DTC_Code >> 8) & 0xFF;
+			else if((dtclst[OVinDTC].DTCStatus & DTC_STATUS_AVAIL) != 0x00){
+				TxData[index] = dtclst[OVinDTC].DTC_Code[0];
 				index++;
-				TxData[index] = dtclst[OVinDTC].DTC_Code & 0xFF;
+				TxData[index] = dtclst[OVinDTC].DTC_Code[1];
 				index++;
-				TxData[index] = 0x01;
+				TxData[index] = dtclst[OVinDTC].DTC_Code[2];
+				index++;
+				TxData[index] = dtclst[OVinDTC].DTCStatus;
+				TxData[0] = 0x07;
 			}
-			else if(dtclst[OCinDTC].active == 1){
-				TxData[index] = (dtclst[OCinDTC].DTC_Code >> 8) & 0xFF;
+			else if((dtclst[OCinDTC].DTCStatus & DTC_STATUS_AVAIL) != 0x00){
+				TxData[index] = dtclst[OCinDTC].DTC_Code[0];
 				index++;
-				TxData[index] = dtclst[OCinDTC].DTC_Code & 0xFF;
+				TxData[index] = dtclst[OCinDTC].DTC_Code[1];
 				index++;
-				TxData[index] = 0x01;
+				TxData[index] = dtclst[OCinDTC].DTC_Code[2];
+				index++;
+				TxData[index] = dtclst[OCinDTC].DTCStatus;
+				TxData[0] = 0x07;
 			}
 			else{
-                /* for misra code*/
+                TxData[3] = 0x00;
 			}
 		}
 		// 지원하지 않는 sub function 요청 응답
@@ -71,15 +78,42 @@ void Process_CAN_Response(CANData_t data) {
 			TxData[1] = 0x7F;
 			TxData[2] = 0x19;
 			TxData[3] = 0x12;
+			TxData[0] = 0x03;
+			while(index < 8){
+				TxData[index] = 0x00;
+				index++;
+			}
 		}
 	}
 	// UDS 0X14 DTC 초기화 요청 처리
-	else if (data.read_request.sid == 0x14) {
-		for(int i = 0; i < MAX_DTC_NUM; i++){
-			dtclst[i].active = 0;
+	else if (data.raw[1] == 0x14) {
+		index = 2;
+		TxHeader.StdId = UDS_RESP_ID;
+		if(data.clear_request.clear_mask_high == 0xFF &&
+			data.clear_request.clear_mask_mid == 0xFF &&
+			data.clear_request.clear_mask_low == 0xFF){
+				for(int i = 0; i < MAX_DTC_NUM; i++){
+					dtclst[i].DTCStatus = 0x00;
+				}
+		}
+		else{
+			for(int i = 0; i < MAX_DTC_NUM; i++){
+				if(dtclst[i].DTC_Code[0] == data.clear_request.clear_mask_high &&
+				dtclst[i].DTC_Code[1] == data.clear_request.clear_mask_mid &&
+				dtclst[i].DTC_Code[2] == data.clear_request.clear_mask_low){
+					dtclst[i].DTCStatus = 0x00;
+					break;
+				}
+			}
 		}
 		EEPROM_WriteDTC();
 		TxData[1] = 0x54;
+		while(index < 8){
+			TxData[index] = 0x00;
+			index++;
+		}
+		TxData[0] = 0x01;
+
 	}
 	else
 	{

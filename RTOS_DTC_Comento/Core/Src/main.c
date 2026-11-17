@@ -176,7 +176,7 @@ int main(void)
     // uart 폴링 방식으로 메시지 출력. 고장이 있으면 고장 개수만큼 에러 메시지 출력. 고장이 없으면 정상 메시지 출력
     int err_count = 0;
     for(int i = 0; i < MAX_DTC_NUM; i++){
-    	if(dtclst[i].active == 1){
+    	if(dtclst[i].DTCStatus != 0x00){
     		HAL_UART_Transmit(&huart4, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
     		err_count++;
     	}
@@ -324,10 +324,10 @@ static void MX_CAN1_Init(void)
   f.FilterBank = 0;
   f.FilterMode = CAN_FILTERMODE_IDMASK;
   f.FilterScale = CAN_FILTERSCALE_32BIT;
-  f.FilterIdHigh = 0x0000;
+  f.FilterIdHigh = (UDS_REQ_ID << 5);
   f.FilterIdLow  = 0x0000;
-  f.FilterMaskIdHigh = 0x0000;  /* 마스크 0 = 전부 통과 */
-  f.FilterMaskIdLow  = 0x0000;
+  f.FilterMaskIdHigh = (0x7FFU << 5);  /* 마스크 0 = 전부 통과 */
+  f.FilterMaskIdLow  = 0x0006;
   f.FilterFIFOAssignment = CAN_RX_FIFO0;
   f.FilterActivation = ENABLE;
   f.SlaveStartFilterBank = 14;

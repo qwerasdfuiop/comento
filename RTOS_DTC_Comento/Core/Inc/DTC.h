@@ -4,19 +4,12 @@
 //DTC 고장 코드 종류 개수
 #define MAX_DTC_NUM 3
 
-// DTC Code 종류
-enum DTC_Code_t {
-	UV = 0x1234,
-	OV = 0x3456,
-	OC = 0x5678,
-};
-
 // DTC Code와 활성화 여부를 같이 저장하기 위한 구조체
 #pragma pack(push, 1)
 
 typedef struct {
-  uint16_t DTC_Code;              // 고장 코드
-  uint8_t active;                 // 활성화 상태 플래그
+  uint8_t DTC_Code[3];              // 고장 코드
+  uint8_t DTCStatus;                 // 활성화 상태 플래그
 } DTC_t;
 
 #pragma pack(pop)
