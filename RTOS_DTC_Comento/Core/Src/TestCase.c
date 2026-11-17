@@ -66,17 +66,17 @@ TestResult WB_TC02_FaultToDTC(void)
     uint8_t check_oc;
 
     //의도한대로 DTC active값이 저장되면 1, 그렇지 않으면 0
-    check_uv = (dtclst[UVinDTC].active == 0);
-    check_ov = (dtclst[OVinDTC].active == 1);
-    check_oc = (dtclst[OCinDTC].active == 1);
+    check_uv = ((dtclst[UVinDTC].DTCStatus & 0x08) == 0);
+    check_ov = ((dtclst[OVinDTC].DTCStatus & 0x08) != 0);
+    check_oc = ((dtclst[OCinDTC].DTCStatus & 0x08) != 0);
     if(!(check_uv && check_ov && check_oc)){
     	return TEST_FAIL;
     }
 
     //의도한대로 DTC code값이 저장되면 1, 그렇지 않으면 0
-    check_uv = (dtclst[UVinDTC].DTC_Code == UV);
-    check_ov = (dtclst[UVinDTC].DTC_Code == OV);
-    check_oc = (dtclst[UVinDTC].DTC_Code == OC);
+    check_uv = (dtclst[UVinDTC].DTC_Code[0] == 0x05) && (dtclst[UVinDTC].DTC_Code[1] == 0x62) && (dtclst[UVinDTC].DTC_Code[2] == 0x16);
+    check_ov = (dtclst[OVinDTC].DTC_Code[0] == 0x05) && (dtclst[OVinDTC].DTC_Code[1] == 0x63) && (dtclst[OVinDTC].DTC_Code[2] == 0x17);
+    check_oc = (dtclst[OCinDTC].DTC_Code[0] == 0x31) && (dtclst[OCinDTC].DTC_Code[1] == 0x01) && (dtclst[OCinDTC].DTC_Code[2] == 0x19);
     if(!(check_uv && check_ov && check_oc)){
     	return TEST_FAIL;
     }
@@ -90,7 +90,7 @@ static void BB_ResetFaults(void)
     voltage_reg_buff.raw = 0;
     current_reg_buff.raw = 0;
     for (int i = 0; i < MAX_DTC_NUM; i++) {
-        dtclst[i].active = 0;
+        dtclst[i].DTCStatus = 0x00;
     }
     bb_tx_seen = 0;
 }
@@ -101,7 +101,7 @@ TestResult BB_TC01_ReadDtcResponse(void)
     // 가상의 요청 데이터 프레임 버퍼 req
     CANData_t req = {0};
     // 기대하는 정답 프레임
-    const uint8_t expect[] = {0x59, 0x02, 0x01, 0x34, 0x56, 0x01};
+    const uint8_t expect[] = {0x07, 0x59, 0x02, DTC_STATUS_AVAIL, 0x05, 0x62, 0x16, 0x08};
 
     // 고장 상태 초기화
     BB_ResetFaults();
@@ -111,14 +111,15 @@ TestResult BB_TC01_ReadDtcResponse(void)
     DTCProcessFault();
 
     // 임의로 UDS 요청 프레임 설정
-    req.read_request.sid = 0x19;
-    req.read_request.sub_func = 0x02;
-    req.read_request.status_mask = 0x01;
+    req.read_request.DLC_length = 0x03;
+    req.read_request.service_id = 0x19;
+    req.read_request.sub_function = 0x02;
+    req.read_request.status_mask = 0xFF;
     // UDS 요청 프레임 처리
     Process_CAN_Response(req);
 
     // 응답 프레임을 정답 프레임과 비교
-    if (memcmp(&bb_tx_data[1], expect, sizeof(expect)) != 0) {
+    if (memcmp(bb_tx_data, expect, sizeof(expect)) != 0) {
         return TEST_FAIL;
     }
     return TEST_PASS;
@@ -130,19 +131,19 @@ TestResult BB_TC02_UnsupportedSubFunction(void)
     // 가상의 요청 데이터 프레임 버퍼 req
     CANData_t req = {0};
     // 기대하는 정답 프레임
-    const uint8_t expect[] = {0x7F, 0x19, 0x12};
+    const uint8_t expect[] = {0x03, 0x7F, 0x19, 0x12, 0x00, 0x00, 0x00, 0x00};
 
     // 고장 상태 초기화
     BB_ResetFaults();
     // 임의로 지원하지 않는 sub-function 요청 프레임 설정
-    req.read_request.sid = 0x19;
-    req.read_request.sub_func = 0xFF;
+    req.read_request.service_id = 0x19;
+    req.read_request.sub_function = 0xFF;
     req.read_request.status_mask = 0x01;
     // UDS 요청 프레임 처리
     Process_CAN_Response(req);
 
     // 응답 프레임을 정답 프레임과 비교
-    if (memcmp(&bb_tx_data[1], expect, sizeof(expect)) != 0) {
+    if (memcmp(bb_tx_data, expect, sizeof(expect)) != 0) {
         return TEST_FAIL;
     }
     return TEST_PASS;
