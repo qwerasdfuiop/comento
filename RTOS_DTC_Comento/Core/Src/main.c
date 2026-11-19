@@ -184,8 +184,9 @@ int main(void)
 
   /* Init scheduler */
   osKernelInitialize();
-#endif
+
   /* USER CODE BEGIN RTOS_MUTEX */
+#endif
   /* add mutexes, ... */
   CommMutexHandle = osMutexNew(&CommMutex_attributes);
   /* USER CODE END RTOS_MUTEX */

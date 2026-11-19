@@ -1273,8 +1273,9 @@ int main(void)
   /* Init scheduler */
   osKernelInitialize();
  8000ad4:	f009 fa94 	bl	800a000 <osKernelInitialize>
-#endif
+
   /* USER CODE BEGIN RTOS_MUTEX */
+#endif
   /* add mutexes, ... */
   CommMutexHandle = osMutexNew(&CommMutex_attributes);
  8000ad8:	4816      	ldr	r0, [pc, #88]	@ (8000b34 <main+0xac>)
