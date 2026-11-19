@@ -74,35 +74,36 @@ DMA_HandleTypeDef hdma_spi2_tx;
 
 UART_HandleTypeDef huart4;
 
-/* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .stack_size = 128 * 4,
+/* Definitions for Task_5ms */
+osThreadId_t Task_5msHandle;
+const osThreadAttr_t Task_5ms_attributes = {
+  .name = "Task_5ms",
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for Task_1ms */
+osThreadId_t Task_1msHandle;
+const osThreadAttr_t Task_1ms_attributes = {
+  .name = "Task_1ms",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal,
+};
+/* Definitions for spiDone */
+osSemaphoreId_t spiDoneHandle;
+const osSemaphoreAttr_t spiDone_attributes = {
+  .name = "spiDone"
+};
+/* Definitions for i2cDone */
+osSemaphoreId_t i2cDoneHandle;
+const osSemaphoreAttr_t i2cDone_attributes = {
+  .name = "i2cDone"
 };
 /* USER CODE BEGIN PV */
 osMutexId_t CommMutexHandle;
 const osMutexAttr_t CommMutex_attributes = {
   .name = "CommMutex"
 };
-osThreadId_t Task_1msHandle;
-const osThreadAttr_t Task_1ms_attributes = {
-  .name = "Task_1ms",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityAboveNormal,
-};
-osThreadId_t Task_5msHandle;
-const osThreadAttr_t Task_5ms_attributes = {
-  .name = "Task_5ms",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
 
-osSemaphoreId_t spiDoneHandle;
-osSemaphoreId_t i2cDoneHandle;
-const osSemaphoreAttr_t spiDone_attributes = { .name = "spiDone" };
-const osSemaphoreAttr_t i2cDone_attributes = { .name = "i2cDone" };
 
 /* USER CODE END PV */
 
@@ -117,9 +118,9 @@ static void MX_I2C2_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_UART4_Init(void);
-void StartDefaultTask(void *argument);
-void StartTask_1ms(void *argument);
 void StartTask_5ms(void *argument);
+void StartTask_1ms(void *argument);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -189,12 +190,16 @@ int main(void)
   CommMutexHandle = osMutexNew(&CommMutex_attributes);
   /* USER CODE END RTOS_MUTEX */
 
+  /* Create the semaphores(s) */
+  /* creation of spiDone */
+  spiDoneHandle = osSemaphoreNew(1, 0, &spiDone_attributes);
+
+  /* creation of i2cDone */
+  i2cDoneHandle = osSemaphoreNew(1, 0, &i2cDone_attributes);
+
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
 
-
-  spiDoneHandle = osSemaphoreNew(1, 0, &spiDone_attributes);
-  i2cDoneHandle = osSemaphoreNew(1, 0, &i2cDone_attributes);
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -206,10 +211,12 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of defaultTask */
-  //defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-  Task_1msHandle = osThreadNew(StartTask_1ms, NULL, &Task_1ms_attributes);
+  /* creation of Task_5ms */
   Task_5msHandle = osThreadNew(StartTask_5ms, NULL, &Task_5ms_attributes);
+
+  /* creation of Task_1ms */
+  Task_1msHandle = osThreadNew(StartTask_1ms, NULL, &Task_1ms_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -668,115 +675,94 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
     can_rx_flag = 1;
   }
 }
-void StartTask_1ms(void *argument)
-{
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  for (;;)
-  {
-    // 1ms 주기 태스크
-    vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
-    // CommMutexHandle 세마포어 획득
-    if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(1)) == osOK)
-    {
-      // PMIC 레지스터 버퍼로부터 DTC로 변환
-      PMIC_Read_Fault();
-      DTCProcessFault();
-      // CAN 인터럽트가 있다면 UDS 프로토콜을 통해 데이터 처리
-      if (can_rx_flag) {
-        can_rx_flag = 0;
-        Process_CAN_Response(data);
-      }
-      // CommMutexHandle 세마포어 해제
-      osMutexRelease(CommMutexHandle);
-    }
-  }
-}
-void StartTask_5ms(void *argument)
-{
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  // 정상/오류 메시지 버퍼
-  const char msg1[] = "ECU System Running\r\n";
-  const char msg2[] = "ECU System Went Wrong\r\n";
 
-  for (;;)
-  {
-    // 5ms 주기 태스크
-    vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(5));
-    // CommMutexHandle 세마포어 획득
-    if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(5)) == osOK)
-    {
-      // ADC 시작
-      HAL_ADC_Start(&hadc1);
-      // PMIC 레지스터 버퍼로부터 DTC로 변환
-      if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
-          uint16_t adc_val = HAL_ADC_GetValue(&hadc1);
-          // UVLO 혹은 OV 고장이 있다면 EEPROM에 DTC를 WRITE
-          if (adc_val < PMIC_CH1_ADC_LOW) {
-        	  PG_volt = 1;
-          }
-      }
-      // ADC 중지
-      HAL_ADC_Stop(&hadc1);
-      // 고장 개수 카운트
-      int err_count = 0;
-      for(int i = 0; i < MAX_DTC_NUM; i++){
-      	if(dtclst[i].DTCStatus != 0x00){
-      		HAL_UART_Transmit(&huart4, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
-      		err_count++;
-      	}
-      }
-      if(err_count == 0){
-      	HAL_UART_Transmit(&huart4, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
-      }
-      // CommMutexHandle 세마포어 해제
-      osMutexRelease(CommMutexHandle);
-    }
-  }
-}
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartDefaultTask */
+/* USER CODE BEGIN Header_StartTask_5ms */
 /**
-  * @brief  Function implementing the defaultTask thread.
+  * @brief  Function implementing the Task_5ms thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
+/* USER CODE END Header_StartTask_5ms */
+void StartTask_5ms(void *argument)
 {
   /* USER CODE BEGIN 5 */
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  // 정상/오류 메시지 버퍼
   const char msg1[] = "ECU System Running\r\n";
   const char msg2[] = "ECU System Went Wrong\r\n";
   /* Infinite loop */
   for(;;)
   {
-    	//I2C DMA INTERRUPT 방식으로 UV 혹은 OV 혹은 OC 여부 READ
-	PMIC_Read_Fault();
-
-	//만일 UV 혹은 OV 가 있다면 EEPROM에 DTC를 WRITE
-	DTCProcessFault();
-
-	// CAN INTERRUPT 방식으로 UDS / OBD 메시지 송수신
-	if (can_rx_flag) {
-	  can_rx_flag = 0;
-	  Process_CAN_Response(data);
-	}
-
-	// uart 폴링 방식으로 메시지 출력. 고장이 있으면 고장 개수만큼 에러 메시지 출력. 고장이 없으면 정상 메시지 출력
-	int err_count = 0;
-	for(int i = 0; i < MAX_DTC_NUM; i++){
-		if(dtclst[i].active == 1){
+	// 5ms 주기 태스크
+	vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(5));
+	// CommMutexHandle 세마포어 획득
+	if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(5)) == osOK)
+	{
+	  // ADC 시작
+	  HAL_ADC_Start(&hadc1);
+	  // PMIC 레지스터 버퍼로부터 DTC로 변환
+	  if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
+		  uint16_t adc_val = HAL_ADC_GetValue(&hadc1);
+		  // UVLO 혹은 OV 고장이 있다면 EEPROM에 DTC를 WRITE
+		  if (adc_val < PMIC_CH1_ADC_LOW) {
+			  PG_volt = 1;
+		  }
+	  }
+	  // ADC 중지
+	  HAL_ADC_Stop(&hadc1);
+	  // 고장 개수 카운트
+	  int err_count = 0;
+	  for(int i = 0; i < MAX_DTC_NUM; i++){
+		if(dtclst[i].DTCStatus != 0x00){
 			HAL_UART_Transmit(&huart4, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
 			err_count++;
 		}
-	}
-	if(err_count == 0){
+	  }
+	  if(err_count == 0){
 		HAL_UART_Transmit(&huart4, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
+	  }
+	  // CommMutexHandle 세마포어 해제
+	  osMutexRelease(CommMutexHandle);
 	}
-    osDelay(10);
   }
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartTask_1ms */
+/**
+* @brief Function implementing the Task_1ms thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTask_1ms */
+void StartTask_1ms(void *argument)
+{
+  /* USER CODE BEGIN StartTask_1ms */
+	TickType_t xLastWakeTime = xTaskGetTickCount();
+  /* Infinite loop */
+  for(;;)
+  {
+	// 1ms 주기 태스크
+	vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
+	// CommMutexHandle 세마포어 획득
+	if (osMutexAcquire(CommMutexHandle, pdMS_TO_TICKS(1)) == osOK)
+	{
+	  // PMIC 레지스터 버퍼로부터 DTC로 변환
+	  PMIC_Read_Fault();
+	  DTCProcessFault();
+	  // CAN 인터럽트가 있다면 UDS 프로토콜을 통해 데이터 처리
+	  if (can_rx_flag) {
+		can_rx_flag = 0;
+		Process_CAN_Response(data);
+	  }
+	  // CommMutexHandle 세마포어 해제
+	  osMutexRelease(CommMutexHandle);
+	}
+  }
+  /* USER CODE END StartTask_1ms */
 }
 
 /**
