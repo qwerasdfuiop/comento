@@ -8,6 +8,8 @@ current_fault_reg current_reg_buff;
 // 임의로 V_REF 단계 설정 가능.
 uint16_t v_ref_set = V_REF_SET;
 
+uint8_t PG_volt = 0;
+
 
 // 각각의 fault register로부터 고장 정보 읽기
 void PMIC_Read_Fault(void){

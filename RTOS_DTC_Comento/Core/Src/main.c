@@ -39,8 +39,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define PMIC_CH1_UVLO_ADC  1117U  /* 0.9V, 3.3V 기준 */
-#define PMIC_CH1_OV_ADC    1365U  /* 1.1V */
+#define PMIC_CH1_ADC_LOW  1117U  /* 0.9V, 3.3V 기준 */
 
 /* USER CODE END PD */
 
@@ -178,13 +177,6 @@ int main(void)
 #else
   //전원이 꺼지기 전 EEPROM에 저장된 DTC 정보 읽기
   EEPROM_ReadDTC();
-  dtclst[UVinDTC].DTC_Code = UV;
-  dtclst[OVinDTC].DTC_Code = OV;
-  dtclst[OCinDTC].DTC_Code = OC;
-  dtclst[BRAKE_UVLOinDTC].DTC_Code = BRAKE_UVLO;
-  if (dtclst[BRAKE_UVLOinDTC].active != 1) {
-    dtclst[BRAKE_UVLOinDTC].active = 0;
-  }
   //PMIC의 VREF 값 설정
   PMIC_Vref_Change(v_ref_set);
   /* USER CODE END 2 */
@@ -719,27 +711,22 @@ void StartTask_5ms(void *argument)
       if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
           uint16_t adc_val = HAL_ADC_GetValue(&hadc1);
           // UVLO 혹은 OV 고장이 있다면 EEPROM에 DTC를 WRITE
-          if ((adc_val < PMIC_CH1_UVLO_ADC) || (adc_val > PMIC_CH1_OV_ADC)) {
-              if (dtclst[BRAKE_UVLOinDTC].active == 0) {
-                  dtclst[BRAKE_UVLOinDTC].active = 1;
-                  EEPROM_WriteDTC();
-              }
+          if (adc_val < PMIC_CH1_ADC_LOW) {
+        	  PG_volt = 1;
           }
       }
       // ADC 중지
       HAL_ADC_Stop(&hadc1);
       // 고장 개수 카운트
       int err_count = 0;
-      // 고장 개수만큼 에러 메시지 출력
-      for (int i = 0; i < MAX_DTC_NUM; i++) {
-        if (dtclst[i].active == 1) {
-          HAL_UART_Transmit(&huart4, (uint8_t *)msg2, strlen(msg2), HAL_MAX_DELAY);
-          err_count++;
-        }
+      for(int i = 0; i < MAX_DTC_NUM; i++){
+      	if(dtclst[i].DTCStatus != 0x00){
+      		HAL_UART_Transmit(&huart4, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
+      		err_count++;
+      	}
       }
-      // 고장이 없으면 정상 메시지 출력
-      if (err_count == 0) {
-        HAL_UART_Transmit(&huart4, (uint8_t *)msg1, strlen(msg1), HAL_MAX_DELAY);
+      if(err_count == 0){
+      	HAL_UART_Transmit(&huart4, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
       }
       // CommMutexHandle 세마포어 해제
       osMutexRelease(CommMutexHandle);

@@ -4,12 +4,11 @@
 #include "EEPROM.h"
 #include "TestCase.h"
 
-// 위 구조체들의 배열
+// DTC_t 구조체들의 배열
 DTC_t dtclst[MAX_DTC_NUM] = {
-		{UV, 0},
-		{OV, 0},
-		{OC, 0},
-		{BRAKE_UVLO, 0},
+	{{0x05, 0x62, 0x16}, 0},
+	{{0x05, 0x63, 0x17}, 0},
+	{{0x31, 0x01, 0x19}, 0},
 };
 
 //PMIC 레지스터 버퍼로부터 DTC로 변환하는 함수
@@ -18,21 +17,15 @@ void DTCProcessFault(void){
 #else
 	if(voltage_reg_buff.raw || current_reg_buff.raw){
 #endif
-		//레지스터 값이 0이 아니면 active = 1
+		//레지스터 값이 0이 아니면 confirmedDTC = 1
 		if (voltage_reg_buff.bit.buckx_uv) {
-		  if (dtclst[UVinDTC].active == 0) {
-			  dtclst[UVinDTC].active = 1;
-		  }
+			dtclst[UVinDTC].DTCStatus |= 0x08;
 		}
 		if (voltage_reg_buff.bit.buckx_ov) {
-		  if (dtclst[OVinDTC].active == 0) {
-			  dtclst[OVinDTC].active = 1;
-		  }
+			  dtclst[OVinDTC].DTCStatus |= 0x08;
 		}
 		if (current_reg_buff.bit.buckx_oc) {
-		  if (dtclst[OCinDTC].active == 0) {
-			  dtclst[OCinDTC].active = 1;
-		  }
+			  dtclst[OCinDTC].DTCStatus |= 0x08;
 		}
 #if TEST_CASE
 #else

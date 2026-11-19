@@ -39,6 +39,8 @@ extern voltage_fault_reg voltage_reg_buff;
 extern current_fault_reg current_reg_buff;
 // 임의로 V_REF 단계 설정 가능.
 extern uint16_t v_ref_set;
+// PG_volt 변수
+extern uint8_t PG_volt;
 
 // PMIC의 VREF 값 변경
 void PMIC_Vref_Change(uint16_t v_ref_set);
