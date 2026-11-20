@@ -5,6 +5,8 @@ voltage_fault_reg voltage_reg_buff;
 // OC 고장 정보 레지스터로부터 읽은 값을 저장하는 변수
 current_fault_reg current_reg_buff;
 
+power_status_reg power_reg_buff;
+
 // 임의로 V_REF 단계 설정 가능.
 uint16_t v_ref_set = V_REF_SET;
 
@@ -38,5 +40,21 @@ void PMIC_Vref_Change(uint16_t v_ref_set){
 	// PMIC_V_REFA_LOW 레지스터 값 변경
 	v_ref_temp = v_ref_set & 0xFF;
 	HAL_I2C_Mem_Write(&hi2c1, PMIC_I2C_ADDR, PMIC_V_REFA_LOW, I2C_MEMADD_SIZE_8BIT, &v_ref_temp, 1, HAL_MAX_DELAY);
+
+}
+
+// 각각의 fault register로부터 고장 정보 읽기
+uint8_t PMIC_Read_Power_Status(void){
+
+	// UV, OV 고장 정보 레지스터로부터 고장 정보 읽기
+	HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, POWER_STATUS_ADDR, I2C_MEMADD_SIZE_8BIT, &power_reg_buff.raw, 1);
+	osSemaphoreAcquire(i2cDoneHandle, 100);
+
+	if(power_reg_buff.bit.fsm_state == 0x01){
+		return 1;
+	}
+	else{
+		return 0;
+	}
 
 }

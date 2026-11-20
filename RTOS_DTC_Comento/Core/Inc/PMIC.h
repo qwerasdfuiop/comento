@@ -13,6 +13,7 @@ enum PMICRegisters_t {
 	VOLTAGE_FAULT_ADDR = 0x07,
 	CURRENT_FAULT_ADDR = 0x08,
 	TEMPERATURE_FAULT_ADDR = 0x09,
+  POWER_STATUS_ADDR = 0x05,
 };
 
 // UV, OV를 확인할 수 있는 레지스터 버퍼
@@ -33,6 +34,17 @@ typedef union {
     uint8_t buckx_oc;
   } bit;
 } current_fault_reg;
+
+// OC를 확인할 수 있는 레지스터 버퍼
+typedef union {
+  uint8_t raw;          
+  struct {
+    uint8_t reserv1	:4;
+    uint8_t fsm_state	:2;
+    uint8_t reserv2	:2;
+  } bit;
+} power_status_reg;
+
 // UV, OV 고장 정보 레지스터로부터 읽은 값을 저장하는 변수
 extern voltage_fault_reg voltage_reg_buff;
 // OC 고장 정보 레지스터로부터 읽은 값을 저장하는 변수
@@ -48,4 +60,6 @@ void PMIC_Vref_Change(uint16_t v_ref_set);
 // PMIC로부터 i2c로 fault여부 읽는 함수
 void PMIC_Read_Fault(void);
 
+// PMIC로부터 power on status 읽는 함수
+uint8_t PMIC_Read_Power_Status(void);
 #endif

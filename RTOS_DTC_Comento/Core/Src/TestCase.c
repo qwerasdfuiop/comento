@@ -7,6 +7,7 @@
 #include <string.h>
 
 #if TEST_CASE
+
 // 모든 테스트 케이스 실행 및 결과 출력
 void TestCase_RunAll(void)
 {
@@ -34,13 +35,13 @@ TestResult WB_TC01_FaultBitDecode(void)
     voltage_reg_buff.raw = 0x01;
     current_reg_buff.raw = 0x10;
 
-    //의도한대로 버퍼에 레지스터값이 저장되면 1, 그렇지 않으면 0
+    //의도한대로 버퍼에 레지스터값이 저장되면 check_ 변수에 1, 그렇지 않으면 0
     uint8_t check_uv;
     uint8_t check_ov;
     uint8_t check_oc;
 
-    check_uv = (voltage_reg_buff.bit.buckx_uv == 0);
-    check_ov = (voltage_reg_buff.bit.buckx_ov == 1);
+    check_uv = (voltage_reg_buff.bit.buckx_uv == 1);
+    check_ov = (voltage_reg_buff.bit.buckx_ov == 0);
     check_oc = (current_reg_buff.bit.buckx_oc == 16);
 
     if(!(check_uv && check_ov && check_oc)){
@@ -65,17 +66,17 @@ TestResult WB_TC02_FaultToDTC(void)
     uint8_t check_oc;
 
     //의도한대로 DTC active값이 저장되면 1, 그렇지 않으면 0
-    check_uv = (dtclst[UVinDTC].active == 0);
-    check_ov = (dtclst[OVinDTC].active == 1);
-    check_oc = (dtclst[OCinDTC].active == 1);
+    check_uv = ((dtclst[UVinDTC].DTCStatus & 0x08) == 0);
+    check_ov = ((dtclst[OVinDTC].DTCStatus & 0x08) != 0);
+    check_oc = ((dtclst[OCinDTC].DTCStatus & 0x08) != 0);
     if(!(check_uv && check_ov && check_oc)){
     	return TEST_FAIL;
     }
 
     //의도한대로 DTC code값이 저장되면 1, 그렇지 않으면 0
-    check_uv = (dtclst[UVinDTC].DTC_Code == UV);
-    check_ov = (dtclst[UVinDTC].DTC_Code == OV);
-    check_oc = (dtclst[UVinDTC].DTC_Code == OC);
+    check_uv = (dtclst[UVinDTC].DTC_Code[0] == 0x05) && (dtclst[UVinDTC].DTC_Code[1] == 0x62) && (dtclst[UVinDTC].DTC_Code[2] == 0x16);
+    check_ov = (dtclst[OVinDTC].DTC_Code[0] == 0x05) && (dtclst[OVinDTC].DTC_Code[1] == 0x63) && (dtclst[OVinDTC].DTC_Code[2] == 0x17);
+    check_oc = (dtclst[OCinDTC].DTC_Code[0] == 0x31) && (dtclst[OCinDTC].DTC_Code[1] == 0x01) && (dtclst[OCinDTC].DTC_Code[2] == 0x19);
     if(!(check_uv && check_ov && check_oc)){
     	return TEST_FAIL;
     }
@@ -83,50 +84,66 @@ TestResult WB_TC02_FaultToDTC(void)
     return TEST_PASS;
 }
 
+//PMIC 레지스터 버퍼, DTC 버퍼를 초기화하는 함수
 static void BB_ResetFaults(void)
 {
     voltage_reg_buff.raw = 0;
     current_reg_buff.raw = 0;
     for (int i = 0; i < MAX_DTC_NUM; i++) {
-        dtclst[i].active = 0;
+        dtclst[i].DTCStatus = 0x00;
     }
     bb_tx_seen = 0;
 }
 
-/* OV 고장 후 ReadDTC(0x19 02 01) 응답이 규격 프레임인지 */
+// 고장 정보에 대한 응답이 규격 프레임인지 확인하는 함수
 TestResult BB_TC01_ReadDtcResponse(void)
 {
+    // 가상의 요청 데이터 프레임 버퍼 req
     CANData_t req = {0};
-    const uint8_t expect[] = {0x59, 0x02, 0x01, 0x34, 0x56, 0x01};
+    // 기대하는 정답 프레임
+    const uint8_t expect[] = {0x07, 0x59, 0x02, DTC_STATUS_AVAIL, 0x05, 0x63, 0x17, 0x08};
 
+    // 고장 상태 초기화
     BB_ResetFaults();
-    voltage_reg_buff.raw = 0x10; /* 상위 니블 OV */
+    // 임의로 전압 고장 상태 설정
+    voltage_reg_buff.raw = 0x10;
+    // 전압 고장 상태를 DTC로 변환
     DTCProcessFault();
 
-    req.read_request.sid = 0x19;
-    req.read_request.sub_func = 0x02;
-    req.read_request.status_mask = 0x01;
+    // 임의로 UDS 요청 프레임 설정
+    req.read_request.DLC_length = 0x03;
+    req.read_request.service_id = 0x19;
+    req.read_request.sub_function = 0x02;
+    req.read_request.status_mask = 0xFF;
+    // UDS 요청 프레임 처리
     Process_CAN_Response(req);
 
-    if (memcmp(&bb_tx_data[1], expect, sizeof(expect)) != 0) {
+    // 응답 프레임을 정답 프레임과 비교
+    if (memcmp(bb_tx_data, expect, sizeof(expect)) != 0) {
         return TEST_FAIL;
     }
     return TEST_PASS;
 }
 
-/* 지원하지 않는 sub-function이면 NRC 0x12 */
+// 지원하지 않는 sub-function 요청에 대한 응답이 규격 프레임인지 확인하는 함수
 TestResult BB_TC02_UnsupportedSubFunction(void)
 {
+    // 가상의 요청 데이터 프레임 버퍼 req
     CANData_t req = {0};
-    const uint8_t expect[] = {0x7F, 0x19, 0x12};
+    // 기대하는 정답 프레임
+    const uint8_t expect[] = {0x03, 0x7F, 0x19, 0x12, 0x00, 0x00, 0x00, 0x00};
 
+    // 고장 상태 초기화
     BB_ResetFaults();
-    req.read_request.sid = 0x19;
-    req.read_request.sub_func = 0xFF;
+    // 임의로 지원하지 않는 sub-function 요청 프레임 설정
+    req.read_request.service_id = 0x19;
+    req.read_request.sub_function = 0xFF;
     req.read_request.status_mask = 0x01;
+    // UDS 요청 프레임 처리
     Process_CAN_Response(req);
 
-    if (memcmp(&bb_tx_data[1], expect, sizeof(expect)) != 0) {
+    // 응답 프레임을 정답 프레임과 비교
+    if (memcmp(bb_tx_data, expect, sizeof(expect)) != 0) {
         return TEST_FAIL;
     }
     return TEST_PASS;

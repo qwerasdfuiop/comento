@@ -1,7 +1,7 @@
 #ifndef TESTCASE_H_
 #define TESTCASE_H_
 
-#define TEST_CASE 0
+#define TEST_CASE 1
 
 #if TEST_CASE
 typedef enum {

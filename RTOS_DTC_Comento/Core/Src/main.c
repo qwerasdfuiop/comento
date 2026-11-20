@@ -176,6 +176,7 @@ int main(void)
 #if TEST_CASE
   TestCase_RunAll();
 #else
+#endif
   //전원이 꺼지기 전 EEPROM에 저장된 DTC 정보 읽기
   EEPROM_ReadDTC();
   //PMIC의 VREF 값 설정
@@ -186,7 +187,7 @@ int main(void)
   osKernelInitialize();
 
   /* USER CODE BEGIN RTOS_MUTEX */
-#endif
+
   /* add mutexes, ... */
   CommMutexHandle = osMutexNew(&CommMutex_attributes);
   /* USER CODE END RTOS_MUTEX */
@@ -708,7 +709,7 @@ void StartTask_5ms(void *argument)
 	  if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
 		  uint16_t adc_val = HAL_ADC_GetValue(&hadc1);
 		  // UVLO 혹은 OV 고장이 있다면 EEPROM에 DTC를 WRITE
-		  if (adc_val < PMIC_CH1_ADC_LOW) {
+		  if (adc_val > PMIC_CH1_ADC_LOW) {
 			  PG_volt = 1;
 		  }
 	  }
