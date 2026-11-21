@@ -73,7 +73,6 @@ UART_HandleTypeDef huart4;
 
 /* USER CODE BEGIN PV */
 
-//volatile uint8_t can_head = 0, can_tail = 0;
 
 /* USER CODE END PV */
 

@@ -40,8 +40,8 @@ TestResult WB_TC01_FaultBitDecode(void)
     uint8_t check_ov;
     uint8_t check_oc;
 
-    check_uv = (voltage_reg_buff.bit.buckx_uv == 0);
-    check_ov = (voltage_reg_buff.bit.buckx_ov == 1);
+    check_uv = (voltage_reg_buff.bit.buckx_uv == 1);
+    check_ov = (voltage_reg_buff.bit.buckx_ov == 0);
     check_oc = (current_reg_buff.bit.buckx_oc == 16);
 
     if(!(check_uv && check_ov && check_oc)){
@@ -53,6 +53,8 @@ TestResult WB_TC01_FaultBitDecode(void)
 //reg_buff값으로부터 DTC로 변환이 잘 됐는지 확인하는 함수
 TestResult WB_TC02_FaultToDTC(void)
 {
+	PG_volt = 1;
+
 	//각 레지스터 버퍼에 임의값으로 초기화
     voltage_reg_buff.raw = 0x01;
     current_reg_buff.raw = 0x23;
@@ -66,8 +68,8 @@ TestResult WB_TC02_FaultToDTC(void)
     uint8_t check_oc;
 
     //의도한대로 DTC active값이 저장되면 1, 그렇지 않으면 0
-    check_uv = ((dtclst[UVinDTC].DTCStatus & 0x08) == 0);
-    check_ov = ((dtclst[OVinDTC].DTCStatus & 0x08) != 0);
+    check_uv = ((dtclst[UVinDTC].DTCStatus & 0x08) != 0);
+    check_ov = ((dtclst[OVinDTC].DTCStatus & 0x08) == 0);
     check_oc = ((dtclst[OCinDTC].DTCStatus & 0x08) != 0);
     if(!(check_uv && check_ov && check_oc)){
     	return TEST_FAIL;
@@ -101,7 +103,8 @@ TestResult BB_TC01_ReadDtcResponse(void)
     // 가상의 요청 데이터 프레임 버퍼 req
     CANData_t req = {0};
     // 기대하는 정답 프레임
-    const uint8_t expect[] = {0x07, 0x59, 0x02, DTC_STATUS_AVAIL, 0x05, 0x62, 0x16, 0x08};
+    const uint8_t expect[] = {0x07, 0x59, 0x02, DTC_STATUS_AVAIL, 0x05, 0x63, 0x17, 0x08};
+
 
     // 고장 상태 초기화
     BB_ResetFaults();

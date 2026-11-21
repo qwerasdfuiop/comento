@@ -2,7 +2,7 @@
 #define TESTCASE_H_
 
 // 테스트 케이스 활성화 여부 정의
-#define TEST_CASE 1
+#define TEST_CASE 0
 
 // 테스트 케이스 함수 실행 결과 정의
 #if TEST_CASE

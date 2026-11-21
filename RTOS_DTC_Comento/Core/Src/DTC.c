@@ -19,13 +19,21 @@ void DTCProcessFault(void){
 #endif
 		//레지스터 값이 0이 아니면 confirmedDTC = 1
 		if (voltage_reg_buff.bit.buckx_uv) {
-			dtclst[UVinDTC].DTCStatus |= 0x08;
+			if(PG_volt == 1){
+				if(PMIC_Read_Power_Status() == 1){
+					dtclst[UVinDTC].DTCStatus |= 0x08;
+				}
+			}
 		}
 		if (voltage_reg_buff.bit.buckx_ov) {
 			  dtclst[OVinDTC].DTCStatus |= 0x08;
 		}
 		if (current_reg_buff.bit.buckx_oc) {
-			  dtclst[OCinDTC].DTCStatus |= 0x08;
+			if(PG_volt == 1){
+				if(PMIC_Read_Power_Status() == 1){
+					dtclst[OCinDTC].DTCStatus |= 0x08;
+				}
+			}
 		}
 #if TEST_CASE
 #else

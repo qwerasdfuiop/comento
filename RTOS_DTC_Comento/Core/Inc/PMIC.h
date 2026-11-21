@@ -6,12 +6,14 @@
 #define PMIC_V_REFA_HIGH  0x13
 #define PMIC_V_REFA_LOW  0x14
 #define V_REF_SET 0xFF // 임의의 값 설정
+#define PMIC_CH1_ADC_LOW  1117U  /* 0.9V, 3.3V 기준 */
 
 // fault 레지스터들의 메모리 주소를 열거형으로
 enum PMICRegisters_t {
 	VOLTAGE_FAULT_ADDR = 0x07,
 	CURRENT_FAULT_ADDR = 0x08,
 	TEMPERATURE_FAULT_ADDR = 0x09,
+	POWER_STATUS_ADDR = 0x05,
 };
 
 // UV, OV를 확인할 수 있는 레지스터 버퍼
@@ -33,6 +35,16 @@ typedef union {
   } bit;
 } current_fault_reg;
 
+// OC를 확인할 수 있는 레지스터 버퍼
+typedef union {
+  uint8_t raw;
+  struct {
+    uint8_t reserv1	:4;
+    uint8_t fsm_state	:2;
+    uint8_t reserv2	:2;
+  } bit;
+} power_status_reg;
+
 // UV, OV 고장 정보 레지스터로부터 읽은 값을 저장하는 변수
 extern voltage_fault_reg voltage_reg_buff;
 // OC 고장 정보 레지스터로부터 읽은 값을 저장하는 변수
@@ -42,10 +54,15 @@ extern uint16_t v_ref_set;
 // I2C 버스 사용 중인지 확인하기 위한 플래그
 extern volatile uint8_t is_i2c_busy;
 
+extern uint8_t PG_volt;
+
 // PMIC의 VREF 값 변경
 void PMIC_Vref_Change(uint16_t v_ref_set);
 
 // PMIC로부터 i2c로 fault여부 읽는 함수
 void PMIC_Read_Fault(void);
+
+// PMIC로부터 power on status 읽는 함수
+uint8_t PMIC_Read_Power_Status(void);
 
 #endif
