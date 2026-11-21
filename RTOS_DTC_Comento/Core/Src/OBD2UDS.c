@@ -38,7 +38,7 @@ void Process_CAN_Response(CANData_t data) {
 			TxData[1] = 0x59;
 			TxData[2] = 0x02;
 			TxData[3] = DTC_STATUS_AVAIL;
-			if((dtclst[UVinDTC].DTCStatus & DTC_STATUS_AVAIL) != 0x00){
+			if((dtclst[UVinDTC].DTCStatus & (DTC_STATUS_AVAIL & data.read_request.status_mask)) != 0x00){
 				TxData[index] = dtclst[UVinDTC].DTC_Code[0];
 				index++;
 				TxData[index] = dtclst[UVinDTC].DTC_Code[1];
@@ -48,7 +48,7 @@ void Process_CAN_Response(CANData_t data) {
 				TxData[index] = dtclst[UVinDTC].DTCStatus;
 				TxData[0] = 0x07;
 			}
-			else if((dtclst[OVinDTC].DTCStatus & DTC_STATUS_AVAIL) != 0x00){
+			else if((dtclst[OVinDTC].DTCStatus  & (DTC_STATUS_AVAIL & data.read_request.status_mask)) != 0x00){
 				TxData[index] = dtclst[OVinDTC].DTC_Code[0];
 				index++;
 				TxData[index] = dtclst[OVinDTC].DTC_Code[1];
@@ -58,7 +58,7 @@ void Process_CAN_Response(CANData_t data) {
 				TxData[index] = dtclst[OVinDTC].DTCStatus;
 				TxData[0] = 0x07;
 			}
-			else if((dtclst[OCinDTC].DTCStatus & DTC_STATUS_AVAIL) != 0x00){
+			else if((dtclst[OCinDTC].DTCStatus & (DTC_STATUS_AVAIL & data.read_request.status_mask)) != 0x00){
 				TxData[index] = dtclst[OCinDTC].DTC_Code[0];
 				index++;
 				TxData[index] = dtclst[OCinDTC].DTC_Code[1];

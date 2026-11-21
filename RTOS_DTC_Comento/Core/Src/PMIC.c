@@ -46,6 +46,9 @@ void PMIC_Vref_Change(uint16_t v_ref_set){
 // 각각의 fault register로부터 고장 정보 읽기
 uint8_t PMIC_Read_Power_Status(void){
 
+#if TEST_CASE
+	return 1;
+#else
 	// UV, OV 고장 정보 레지스터로부터 고장 정보 읽기
 	HAL_I2C_Mem_Read_DMA(&hi2c1, PMIC_I2C_ADDR, POWER_STATUS_ADDR, I2C_MEMADD_SIZE_8BIT, &power_reg_buff.raw, 1);
 	osSemaphoreAcquire(i2cDoneHandle, 100);
@@ -56,5 +59,5 @@ uint8_t PMIC_Read_Power_Status(void){
 	else{
 		return 0;
 	}
-
+#endif
 }

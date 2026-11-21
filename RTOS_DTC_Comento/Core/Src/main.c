@@ -39,7 +39,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define PMIC_CH1_ADC_LOW  1117U  /* 0.9V, 3.3V 기준 */
+
 
 /* USER CODE END PD */
 
@@ -175,12 +175,9 @@ int main(void)
 
 #if TEST_CASE
   TestCase_RunAll();
-#else
 #endif
-  //전원이 꺼지기 전 EEPROM에 저장된 DTC 정보 읽기
-  EEPROM_ReadDTC();
-  //PMIC의 VREF 값 설정
-  PMIC_Vref_Change(v_ref_set);
+
+
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -201,7 +198,6 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
-
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -234,7 +230,6 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-	//msg1은 고장이 없을때 UART 출력, msg2는 고장이 있을때 UART 출력
 
   while (1)
   {
@@ -377,10 +372,10 @@ static void MX_CAN1_Init(void)
   f.FilterBank = 0;
   f.FilterMode = CAN_FILTERMODE_IDMASK;
   f.FilterScale = CAN_FILTERSCALE_32BIT;
-  f.FilterIdHigh = 0x0000;
+  f.FilterIdHigh = (UDS_REQ_ID << 5);
   f.FilterIdLow  = 0x0000;
-  f.FilterMaskIdHigh = 0x0000;  /* 마스크 0 = 전부 통과 */
-  f.FilterMaskIdLow  = 0x0000;
+  f.FilterMaskIdHigh = (0x7FFU << 5);
+  f.FilterMaskIdLow  = 0x0006;
   f.FilterFIFOAssignment = CAN_RX_FIFO0;
   f.FilterActivation = ENABLE;
   f.SlaveStartFilterBank = 14;
@@ -744,6 +739,10 @@ void StartTask_1ms(void *argument)
 {
   /* USER CODE BEGIN StartTask_1ms */
 	TickType_t xLastWakeTime = xTaskGetTickCount();
+  //전원이 꺼지기 전 EEPROM에 저장된 DTC 정보 읽기
+  EEPROM_ReadDTC();
+  //PMIC의 VREF 값 설정
+  PMIC_Vref_Change(v_ref_set);
   /* Infinite loop */
   for(;;)
   {

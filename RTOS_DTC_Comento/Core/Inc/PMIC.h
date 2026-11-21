@@ -7,6 +7,7 @@
 #define PMIC_V_REFA_LOW  0x14
 // VREF값 설정
 #define V_REF_SET 0xFF 
+#define PMIC_CH1_ADC_LOW  1117U  /* 0.9V, 3.3V 기준 */
 
 // fault 레지스터들의 메모리 주소를 열거형으로
 enum PMICRegisters_t {

@@ -53,7 +53,9 @@ TestResult WB_TC01_FaultBitDecode(void)
 //reg_buff값으로부터 DTC로 변환이 잘 됐는지 확인하는 함수
 TestResult WB_TC02_FaultToDTC(void)
 {
-	//각 레지스터 버퍼에 임의값으로 초기화
+    PG_volt = 1;
+    
+    //각 레지스터 버퍼에 임의값으로 초기화
     voltage_reg_buff.raw = 0x01;
     current_reg_buff.raw = 0x23;
 
@@ -66,8 +68,8 @@ TestResult WB_TC02_FaultToDTC(void)
     uint8_t check_oc;
 
     //의도한대로 DTC active값이 저장되면 1, 그렇지 않으면 0
-    check_uv = ((dtclst[UVinDTC].DTCStatus & 0x08) == 0);
-    check_ov = ((dtclst[OVinDTC].DTCStatus & 0x08) != 0);
+    check_uv = ((dtclst[UVinDTC].DTCStatus & 0x08) != 0);
+    check_ov = ((dtclst[OVinDTC].DTCStatus & 0x08) == 0);
     check_oc = ((dtclst[OCinDTC].DTCStatus & 0x08) != 0);
     if(!(check_uv && check_ov && check_oc)){
     	return TEST_FAIL;
